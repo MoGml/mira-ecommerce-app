@@ -14,17 +14,17 @@
       "distribution": "internal",
       "ios": {
         "simulator": false,
-        "bundleIdentifier": "com.mira.app"
+        "bundleIdentifier": "com.modawa.mira"
       }
     },
     "production": {
       "distribution": "store",
       "ios": {
-        "bundleIdentifier": "com.mira.app",
+        "bundleIdentifier": "com.modawa.mira",
         "buildNumber": "1"
       },
       "android": {
-        "package": "com.mira.app",
+        "package": "com.modawa.mira",
         "versionCode": 1
       }
     }

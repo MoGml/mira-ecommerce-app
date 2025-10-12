@@ -14,7 +14,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.mira.app",
+      "bundleIdentifier": "com.modawa.mira",
       "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Mira needs your location to provide accurate delivery addresses and show nearby stores.",
@@ -34,7 +34,7 @@
       }
     },
     "android": {
-      "package": "com.mira.app",
+      "package": "com.modawa.mira",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF0000"
