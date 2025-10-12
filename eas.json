@@ -1,0 +1,46 @@
+{
+  "cli": {
+    "version": ">= 5.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "bundleIdentifier": "com.mira.app"
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "ios": {
+        "bundleIdentifier": "com.mira.app",
+        "buildNumber": "1"
+      },
+      "android": {
+        "package": "com.mira.app",
+        "versionCode": 1
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@email.com",
+        "ascAppId": "YOUR_ASC_APP_ID",
+        "appleTeamId": "YOUR_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./service-account-key.json",
+        "track": "internal"
+      }
+    }
+  }
+}
+

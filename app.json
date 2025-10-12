@@ -13,8 +13,9 @@
       "backgroundColor": "#FF0000"
     },
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.mira.app",
+      "buildNumber": "1",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Mira needs your location to provide accurate delivery addresses and show nearby stores.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Mira needs your location to track delivery status and provide real-time updates.",
