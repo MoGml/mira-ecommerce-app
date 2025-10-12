@@ -13,18 +13,52 @@
       "backgroundColor": "#FF0000"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.mira.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Mira needs your location to provide accurate delivery addresses and show nearby stores.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Mira needs your location to track delivery status and provide real-time updates.",
+        "NSLocationAlwaysUsageDescription": "Mira needs your location to track delivery status even when the app is in the background.",
+        "UIBackgroundModes": [
+          "location",
+          "fetch",
+          "remote-notification"
+        ],
+        "NSUserTrackingUsageDescription": "Mira would like to track your activity to improve your shopping experience and show you relevant offers.",
+        "NSPhotoLibraryUsageDescription": "Mira needs access to your photos to allow you to upload profile pictures.",
+        "NSCameraUsageDescription": "Mira needs camera access to allow you to take photos for your profile."
+      },
+      "config": {
+        "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
+      }
     },
     "android": {
+      "package": "com.mira.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FF0000"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "POST_NOTIFICATIONS",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
+        }
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-tracking-transparency"
+    ]
   }
 }

@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
 import CartItemCard from '../components/CartItemCard';
 import OutOfStockBanner from '../components/OutOfStockBanner';
 import OrderAgainCarousel from '../components/OrderAgainCarousel';
@@ -22,6 +23,7 @@ import {
 } from '../models/data';
 
 export default function CartScreen({ navigation }: any) {
+  const { isAuthenticated, user } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>(sampleCartItems);
   const [selectedAddress, setSelectedAddress] = useState(sampleAddresses[0]);
   const [deliverySlot, setDeliverySlot] = useState('8:00 PM – 10:00 PM');
@@ -113,6 +115,28 @@ export default function CartScreen({ navigation }: any) {
   };
 
   const handleCheckout = (shipmentType?: 'express' | 'scheduled') => {
+    // Check if user is authenticated
+    if (!isAuthenticated || !user) {
+      Alert.alert(
+        'Sign In Required',
+        'Please sign in to proceed with checkout',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Sign In',
+            onPress: () => {
+              // User will be redirected to auth flow automatically
+              // You can also navigate to a specific auth screen if needed
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     const items = shipmentType 
       ? (shipmentType === 'express' ? expressItems : scheduledItems)
       : cartItems;
