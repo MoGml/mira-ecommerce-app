@@ -45,7 +45,8 @@
         "ACCESS_BACKGROUND_LOCATION",
         "POST_NOTIFICATIONS",
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "com.google.android.gms.permission.AD_ID"
       ],
       "config": {
         "googleMaps": {
@@ -60,6 +61,11 @@
     },
     "plugins": [
       "expo-tracking-transparency"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "fdbfd0a5-3d41-4d0a-8836-83972f197d3c"
+      }
+    }
   }
 }

@@ -35,14 +35,14 @@ const OutOfStockBanner: React.FC<OutOfStockBannerProps> = ({
         </View>
         {onRemoveItem && (
           <TouchableOpacity style={styles.removeButton} onPress={onRemoveItem}>
-            <Ionicons name="close" size={20} color="white" />
+            <Ionicons name="close-circle" size={24} color="white" />
           </TouchableOpacity>
         )}
       </View>
       
       {/* Replacement Carousel */}
       <View style={styles.carouselContainer}>
-        <Text style={styles.carouselTitle}>Suggested Replacements</Text>
+        <Text style={styles.carouselTitle}>Replace with similar items</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -101,17 +101,17 @@ const OutOfStockBanner: React.FC<OutOfStockBannerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFF5F5',
-    marginBottom: 12,
-    borderRadius: 8,
+    backgroundColor: 'white',
+    marginBottom: 16,
     overflow: 'hidden',
   },
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#FF0000',
-    padding: 12,
+    backgroundColor: '#FF3B30',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
   },
   errorContent: {
     flexDirection: 'row',
@@ -123,56 +123,55 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 13,
     fontWeight: '500',
-    marginLeft: 8,
+    marginLeft: 10,
+    lineHeight: 18,
   },
   removeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 8,
+    padding: 4,
   },
   carouselContainer: {
-    padding: 12,
-    paddingBottom: 0,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
+    backgroundColor: 'white',
   },
   carouselTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    color: '#000',
+    marginBottom: 16,
   },
   scrollContent: {
     paddingRight: 12,
   },
   replacementCard: {
-    width: 140,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 8,
+    width: 130,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    padding: 10,
     marginRight: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   replacementImage: {
     width: '100%',
-    height: 100,
-    borderRadius: 6,
-    marginBottom: 8,
+    height: 110,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: 'white',
   },
   replacementInfo: {
-    marginBottom: 8,
+    marginBottom: 10,
   },
   replacementName: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
+    lineHeight: 16,
   },
   replacementSize: {
     fontSize: 11,
@@ -180,15 +179,15 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   replacementPrice: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000',
   },
   addButton: {
-    backgroundColor: '#FF0000',
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    backgroundColor: '#000',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',

@@ -32,11 +32,13 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       <View style={styles.imageContainer}>
         <Image 
           source={{ uri: product.image }} 
-          style={[styles.productImage, isOutOfStock && styles.outOfStockImage]} 
+          style={styles.productImage} 
         />
         {isOutOfStock && (
-          <View style={styles.outOfStockBadge}>
-            <Text style={styles.outOfStockBadgeText}>Out of stock</Text>
+          <View style={styles.outOfStockOverlay}>
+            <View style={styles.outOfStockBadge}>
+              <Text style={styles.outOfStockBadgeText}>Out of stock</Text>
+            </View>
           </View>
         )}
       </View>
@@ -58,7 +60,8 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         
         {onEditOptions && !isOutOfStock && (
           <TouchableOpacity onPress={() => onEditOptions(item.id)}>
-            <Text style={styles.editOptions}>Edit Options</Text>
+            <Text style={styles.editOptions}>Options</Text>
+            <Ionicons name="chevron-forward" size={14} color="#999" />
           </TouchableOpacity>
         )}
         
@@ -67,48 +70,49 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
         </Text>
       </View>
       
-      <View style={styles.quantityContainer}>
-        {isOutOfStock ? (
+      {isOutOfStock ? (
+        <View style={styles.outOfStockActions}>
+          <Text style={styles.outOfStockQuantity}>{quantity}</Text>
           <TouchableOpacity 
-            style={[styles.quantityButton, styles.trashButton]} 
+            style={styles.outOfStockTrashButton} 
             onPress={() => onRemove(item.id)}
           >
             <Ionicons 
-              name="trash" 
+              name="trash-outline" 
+              size={20} 
+              color="#FF0000" 
+            />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <View style={styles.quantityContainer}>
+          <TouchableOpacity 
+            style={styles.quantityButton} 
+            onPress={() => quantity === 1 ? onRemove(item.id) : onDecrement(item.id)}
+          >
+            <Ionicons 
+              name={quantity === 1 ? "trash" : "remove"} 
               size={18} 
               color="#FF0000" 
             />
           </TouchableOpacity>
-        ) : (
-          <>
-            <TouchableOpacity 
-              style={styles.quantityButton} 
-              onPress={() => quantity === 1 ? onRemove(item.id) : onDecrement(item.id)}
-            >
-              <Ionicons 
-                name={quantity === 1 ? "trash" : "remove"} 
-                size={18} 
-                color="#FF0000" 
-              />
-            </TouchableOpacity>
-            
-            <Text style={styles.quantity}>
-              {quantity}
-            </Text>
-            
-            <TouchableOpacity 
-              style={styles.quantityButton} 
-              onPress={() => onIncrement(item.id)}
-            >
-              <Ionicons 
-                name="add" 
-                size={18} 
-                color="#FF0000" 
-              />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+          
+          <Text style={styles.quantity}>
+            {quantity}
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.quantityButton} 
+            onPress={() => onIncrement(item.id)}
+          >
+            <Ionicons 
+              name="add" 
+              size={18} 
+              color="#FF0000" 
+            />
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -118,38 +122,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: 'white',
     padding: 12,
-    marginBottom: 8,
-    borderRadius: 8,
+    marginBottom: 1,
+    borderRadius: 0,
   },
   outOfStockContainer: {
-    backgroundColor: '#FFF5F5',
-    borderLeftWidth: 3,
-    borderLeftColor: '#FF0000',
+    backgroundColor: '#FAFAFA',
   },
   imageContainer: {
     position: 'relative',
     marginRight: 12,
   },
   productImage: {
-    width: 80,
-    height: 80,
+    width: 70,
+    height: 70,
     borderRadius: 8,
+    backgroundColor: '#F5F5F5',
   },
-  outOfStockImage: {
-    opacity: 0.4,
+  outOfStockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(128, 128, 128, 0.6)',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   outOfStockBadge: {
-    position: 'absolute',
-    bottom: 4,
-    left: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingVertical: 2,
-    paddingHorizontal: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 4,
   },
   outOfStockBadgeText: {
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: '600',
     color: 'white',
     textAlign: 'center',
@@ -215,6 +218,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     paddingHorizontal: 8,
+  },
+  outOfStockActions: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  outOfStockQuantity: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999',
+  },
+  outOfStockTrashButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFF5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
