@@ -45,10 +45,18 @@ const OutOfStockBanner: React.FC<OutOfStockBannerProps> = ({
               style={styles.replacementCard}
               onPress={() => onSelectReplacement(product)}
             >
-              <Image 
-                source={{ uri: product.image }} 
-                style={styles.replacementImage}
-              />
+              <View style={styles.imageWrapper}>
+                <Image 
+                  source={{ uri: product.image }} 
+                  style={styles.replacementImage}
+                />
+                <TouchableOpacity 
+                  style={styles.replaceButton}
+                  onPress={() => onSelectReplacement(product)}
+                >
+                  <Ionicons name="repeat-outline" size={18} color="white" />
+                </TouchableOpacity>
+              </View>
               <View style={styles.replacementInfo}>
                 <Text style={styles.replacementName} numberOfLines={2}>
                   {product.name}
@@ -62,12 +70,6 @@ const OutOfStockBanner: React.FC<OutOfStockBannerProps> = ({
                   LE {product.price.toFixed(2)}
                 </Text>
               </View>
-              <TouchableOpacity 
-                style={styles.addButton}
-                onPress={() => onSelectReplacement(product)}
-              >
-                <Ionicons name="add" size={18} color="white" />
-              </TouchableOpacity>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -102,6 +104,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFEBEE',
     paddingHorizontal: 16,
     paddingVertical: 12,
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 16,
+    borderRadius: 8,
     gap: 10,
   },
   errorText: {
@@ -135,15 +141,34 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#F0F0F0',
   },
+  imageWrapper: {
+    position: 'relative',
+    marginBottom: 10,
+  },
   replacementImage: {
     width: '100%',
     height: 110,
     borderRadius: 8,
-    marginBottom: 10,
     backgroundColor: 'white',
   },
+  replaceButton: {
+    position: 'absolute',
+    bottom: 6,
+    right: 6,
+    backgroundColor: '#000',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    elevation: 5,
+  },
   replacementInfo: {
-    marginBottom: 10,
+    marginBottom: 0,
   },
   replacementName: {
     fontSize: 13,
@@ -161,15 +186,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#000',
-  },
-  addButton: {
-    backgroundColor: '#000',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    alignSelf: 'center',
   },
   combosContainer: {
     flexDirection: 'row',
