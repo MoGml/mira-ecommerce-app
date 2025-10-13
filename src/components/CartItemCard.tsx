@@ -96,7 +96,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       
       {/* Quantity Controls or Out of Stock Actions */}
       {isOutOfStock ? (
-        <View style={styles.outOfStockActionsColumn}>
+        <View style={styles.outOfStockActionsRow}>
           <TouchableOpacity 
             style={styles.outOfStockTrashButton} 
             onPress={() => onRemove(item.id)}
@@ -104,16 +104,9 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             <View style={styles.trashIconContainer}>
               <Ionicons 
                 name="trash-bin" 
-                size={22} 
+                size={18} 
                 color="#FF0000" 
               />
-              <View style={styles.xMark}>
-                <Ionicons 
-                  name="close" 
-                  size={10} 
-                  color="#FF0000" 
-                />
-              </View>
             </View>
           </TouchableOpacity>
           <Text style={styles.outOfStockQuantity}>{quantity}</Text>
@@ -288,11 +281,12 @@ const styles = StyleSheet.create({
   },
   
   // Out of Stock Actions
-  outOfStockActionsColumn: {
-    flexDirection: 'column',
+  outOfStockActionsRow: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 16,
+    gap: 8,
   },
   outOfStockTrashButton: {
     width: 32,
@@ -301,20 +295,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFE8E8',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 1,
   },
   trashIconContainer: {
-    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
     width: 18,
     height: 18,
-  },
-  xMark: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -3 }, { translateY: -3 }],
   },
   outOfStockQuantity: {
     fontSize: 12,
