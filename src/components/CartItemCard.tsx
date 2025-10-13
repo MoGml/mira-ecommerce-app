@@ -79,11 +79,20 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             style={styles.outOfStockTrashButton} 
             onPress={() => onRemove(item.id)}
           >
-            <Ionicons 
-              name="trash-bin-outline" 
-              size={20} 
-              color="#FF0000" 
-            />
+            <View style={styles.trashIconContainer}>
+              <Ionicons 
+                name="trash-bin" 
+                size={24} 
+                color="#FF0000" 
+              />
+              <View style={styles.xMark}>
+                <Ionicons 
+                  name="close" 
+                  size={10} 
+                  color="#FF0000" 
+                />
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
       ) : (
@@ -237,10 +246,25 @@ const styles = StyleSheet.create({
     color: '#999',
   },
   outOfStockTrashButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFE8E8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trashIconContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 24,
+    height: 24,
+  },
+  xMark: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -5 }, { translateY: -5 }],
     justifyContent: 'center',
     alignItems: 'center',
   },
