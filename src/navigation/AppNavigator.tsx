@@ -12,6 +12,7 @@ import CartScreen from '../screens/CartScreen';
 import CheckoutScreen from '../screens/CheckoutScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import DiscountsScreen from '../screens/DiscountsScreen';
+import SavedAddressesScreen from '../screens/profile/SavedAddressesScreen';
 
 // Types
 export type RootTabParamList = {
@@ -38,9 +39,16 @@ export type BagStackParamList = {
   };
 };
 
+export type ProfileStackParamList = {
+  ProfileMain: undefined;
+  SavedAddresses: undefined;
+  SavedCards: undefined;
+};
+
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const CategoriesStack = createStackNavigator<CategoriesStackParamList>();
 const BagStack = createStackNavigator<BagStackParamList>();
+const ProfileStack = createStackNavigator<ProfileStackParamList>();
 
 // Categories Stack Navigator
 function CategoriesStackNavigator() {
@@ -75,6 +83,24 @@ function BagStackNavigator() {
         options={{ headerShown: false }}
       />
     </BagStack.Navigator>
+  );
+}
+
+// Profile Stack Navigator
+function ProfileStackNavigator() {
+  return (
+    <ProfileStack.Navigator>
+      <ProfileStack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen}
+        options={{ headerShown: false }}
+      />
+      <ProfileStack.Screen 
+        name="SavedAddresses" 
+        component={SavedAddressesScreen}
+        options={{ headerShown: false }}
+      />
+    </ProfileStack.Navigator>
   );
 }
 
@@ -162,8 +188,8 @@ export default function AppNavigator() {
         />
         <Tab.Screen 
           name="Profile" 
-          component={ProfileScreen}
-          options={{ title: 'Profile' }}
+          component={ProfileStackNavigator}
+          options={{ headerShown: false }}
         />
       </Tab.Navigator>
     </NavigationContainer>

@@ -30,7 +30,7 @@
         "NSCameraUsageDescription": "Mira needs camera access to allow you to take photos for your profile."
       },
       "config": {
-        "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": "AIzaSyA1wBN5q6PIct5UOkkAOosEhhm1x74guw4"
       }
     },
     "android": {

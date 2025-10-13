@@ -14,7 +14,7 @@ interface AddAddressScreenProps {
 
 // IMPORTANT: Replace with your actual Google Places API key
 const GOOGLE_PLACES_API_KEY = Platform.select({
-  ios: 'YOUR_IOS_GOOGLE_PLACES_API_KEY',
+  ios: 'AIzaSyA1wBN5q6PIct5UOkkAOosEhhm1x74guw4',
   android: 'YOUR_ANDROID_GOOGLE_PLACES_API_KEY',
   default: 'YOUR_GOOGLE_PLACES_API_KEY',
 });
