@@ -12,17 +12,13 @@ const LanguageScreen: React.FC<LanguageScreenProps> = ({ onNext }) => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.content}>
-        {/* Illustration */}
-        <View style={styles.illustrationContainer}>
-          <View style={styles.phoneIllustration}>
-            <View style={styles.phoneScreen}>
-              <View style={styles.gridItem} />
-              <View style={styles.gridItem} />
-              <View style={styles.gridItem} />
-              <View style={styles.gridItem} />
-            </View>
-          </View>
-          <View style={styles.personIllustration} />
+        {/* Logo */}
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../../../assets/logo.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
         </View>
 
         <Text style={styles.title}>Order Online</Text>
@@ -80,48 +76,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 20,
   },
-  illustrationContainer: {
+  logoContainer: {
     alignItems: 'center',
     marginBottom: 32,
     marginTop: 20,
   },
-  phoneIllustration: {
-    width: 140,
-    height: 200,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#333',
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  phoneScreen: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 8,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 8,
-    gap: 8,
-  },
-  gridItem: {
-    width: '45%',
-    height: 40,
-    backgroundColor: '#DDD',
-    borderRadius: 6,
-  },
-  personIllustration: {
-    width: 60,
-    height: 80,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 30,
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
+  logoImage: {
+    width: 120,
+    height: 120,
   },
   title: {
     fontSize: 28,

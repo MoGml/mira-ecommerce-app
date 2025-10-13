@@ -60,46 +60,31 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onFinish }) => {
       case 'shopping':
         return (
           <View style={styles.illustrationContainer}>
-            <View style={styles.phoneFrame}>
-              <View style={styles.phoneContent}>
-                <View style={styles.shoppingGrid}>
-                  <View style={[styles.gridItem, { backgroundColor: '#FFE5E5' }]} />
-                  <View style={[styles.gridItem, { backgroundColor: '#E5F5FF' }]} />
-                  <View style={[styles.gridItem, { backgroundColor: '#FFF5E5' }]} />
-                  <View style={[styles.gridItem, { backgroundColor: '#E5FFE5' }]} />
-                </View>
-              </View>
-            </View>
-            <View style={styles.cartIcon}>
-              <View style={styles.cartHandle} />
-            </View>
-            <View style={styles.personFigure} />
+            <Image 
+              source={require('../../../assets/Illustration.png')} 
+              style={styles.illustrationImage}
+              resizeMode="contain"
+            />
           </View>
         );
       case 'delivery':
         return (
           <View style={styles.illustrationContainer}>
-            <View style={styles.basketContainer}>
-              <View style={styles.basket}>
-                <View style={styles.vegetable1} />
-                <View style={styles.vegetable2} />
-                <View style={styles.vegetable3} />
-              </View>
-            </View>
+            <Image 
+              source={require('../../../assets/Illustration2.png')} 
+              style={styles.illustrationImage}
+              resizeMode="contain"
+            />
           </View>
         );
       case 'payment':
         return (
           <View style={styles.illustrationContainer}>
-            <View style={styles.scooterContainer}>
-              <View style={styles.scooterBody} />
-              <View style={styles.scooterWheel} />
-              <View style={styles.deliveryBox} />
-            </View>
-            <View style={styles.doorFrame}>
-              <View style={styles.doorHandle} />
-            </View>
-            <View style={styles.deliveryPerson} />
+            <Image 
+              source={require('../../../assets/Illustration3.png')} 
+              style={styles.illustrationImage}
+              resizeMode="contain"
+            />
           </View>
         );
       default:
@@ -185,166 +170,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 40,
   },
-  phoneFrame: {
-    width: 160,
-    height: 240,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 24,
-    borderWidth: 4,
-    borderColor: '#333',
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  phoneContent: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 12,
-  },
-  shoppingGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  gridItem: {
-    width: 55,
-    height: 55,
-    borderRadius: 12,
-  },
-  cartIcon: {
-    position: 'absolute',
-    bottom: 100,
-    right: 40,
-    width: 60,
-    height: 50,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    borderWidth: 3,
-    borderColor: '#333',
-  },
-  cartHandle: {
-    width: 30,
-    height: 15,
-    borderWidth: 3,
-    borderColor: '#333',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomWidth: 0,
-    alignSelf: 'center',
-    marginTop: -10,
-  },
-  personFigure: {
-    position: 'absolute',
-    bottom: 80,
-    left: 40,
-    width: 50,
-    height: 80,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 25,
-  },
-  basketContainer: {
-    alignItems: 'center',
-  },
-  basket: {
-    width: 180,
-    height: 120,
-    backgroundColor: '#FF3B58',
-    borderRadius: 16,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    position: 'relative',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  vegetable1: {
-    width: 40,
-    height: 50,
-    backgroundColor: '#4CAF50',
-    borderRadius: 20,
-    position: 'absolute',
-    top: 10,
-    left: 30,
-  },
-  vegetable2: {
-    width: 35,
-    height: 45,
-    backgroundColor: '#FF9800',
-    borderRadius: 18,
-    position: 'absolute',
-    top: 15,
-    right: 30,
-  },
-  vegetable3: {
-    width: 45,
-    height: 40,
-    backgroundColor: '#2196F3',
-    borderRadius: 20,
-    position: 'absolute',
-    bottom: 15,
-  },
-  scooterContainer: {
-    position: 'relative',
-    marginBottom: 40,
-  },
-  scooterBody: {
-    width: 120,
-    height: 80,
-    backgroundColor: '#FF3B58',
-    borderRadius: 40,
-  },
-  scooterWheel: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#333',
-    position: 'absolute',
-    bottom: -10,
-    right: 10,
-  },
-  deliveryBox: {
-    width: 50,
-    height: 50,
-    backgroundColor: '#FFE5E5',
-    borderRadius: 8,
-    position: 'absolute',
-    top: -20,
-    left: 10,
-  },
-  doorFrame: {
-    width: 100,
-    height: 160,
-    backgroundColor: '#333',
-    borderRadius: 12,
-    position: 'absolute',
-    right: 40,
-    top: 60,
-  },
-  doorHandle: {
-    width: 8,
-    height: 20,
-    backgroundColor: '#FFD700',
-    borderRadius: 4,
-    position: 'absolute',
-    right: 20,
-    top: '50%',
-  },
-  deliveryPerson: {
-    width: 50,
-    height: 80,
-    backgroundColor: '#FF6B6B',
-    borderRadius: 25,
-    position: 'absolute',
-    right: 100,
-    bottom: 40,
+  illustrationImage: {
+    width: '100%',
+    height: '100%',
+    maxWidth: 300,
+    maxHeight: 300,
   },
   textContainer: {
     paddingBottom: 40,

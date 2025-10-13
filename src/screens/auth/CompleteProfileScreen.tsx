@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -72,10 +72,11 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
         >
           {/* Logo */}
           <View style={styles.logoContainer}>
-            <View style={styles.logoBox}>
-              <View style={styles.logoHandle} />
-            </View>
-            <Text style={styles.logoText}>mira</Text>
+            <Image 
+              source={require('../../../assets/logo.png')} 
+              style={styles.logoImage}
+              resizeMode="contain"
+            />
           </View>
 
           <View style={styles.progressBar}>
@@ -176,27 +177,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 20,
   },
-  logoBox: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#FF0000',
-    borderRadius: 12,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 8,
-    marginBottom: 8,
-  },
-  logoHandle: {
-    width: 30,
-    height: 3,
-    backgroundColor: 'white',
-    borderRadius: 2,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FF0000',
-    letterSpacing: 1,
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   progressBar: {
     flexDirection: 'row',

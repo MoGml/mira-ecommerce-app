@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, Image } from 'react-native';
 
 interface SplashScreenProps {
   onFinish: () => void;
@@ -25,10 +25,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.logoContainer, { opacity: fadeAnim }]}>
-        {/* Mira logo placeholder */}
-        <View style={styles.logoBox}>
-          <View style={styles.logoHandle} />
-        </View>
+        <Image 
+          source={require('../../../assets/splash-icon.png')} 
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
         <Animated.Text style={styles.logoText}>mira</Animated.Text>
       </Animated.View>
     </View>
@@ -45,21 +46,10 @@ const styles = StyleSheet.create({
   logoContainer: {
     alignItems: 'center',
   },
-  logoBox: {
-    width: 80,
-    height: 80,
-    backgroundColor: 'white',
-    borderRadius: 12,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 10,
-    marginBottom: 8,
-  },
-  logoHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#FF0000',
-    borderRadius: 2,
+  logoImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 16,
   },
   logoText: {
     fontSize: 48,
