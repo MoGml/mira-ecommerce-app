@@ -72,17 +72,17 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       
       {isOutOfStock ? (
         <View style={styles.outOfStockActions}>
-          <Text style={styles.outOfStockQuantity}>{quantity}</Text>
           <TouchableOpacity 
             style={styles.outOfStockTrashButton} 
             onPress={() => onRemove(item.id)}
           >
             <Ionicons 
               name="trash-outline" 
-              size={20} 
+              size={22} 
               color="#FF0000" 
             />
           </TouchableOpacity>
+          <Text style={styles.outOfStockQuantity}>{quantity}</Text>
         </View>
       ) : (
         <View style={styles.quantityContainer}>
@@ -220,23 +220,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   outOfStockActions: {
-    flexDirection: 'column',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-  },
-  outOfStockQuantity: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#999',
+    gap: 12,
   },
   outOfStockTrashButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FFF5F5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFE8E8',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  outOfStockQuantity: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#999',
   },
 });
 

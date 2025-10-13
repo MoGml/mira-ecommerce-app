@@ -327,7 +327,6 @@ export default function CartScreen({ navigation }: any) {
                 <OutOfStockBanner
                   replacementProducts={replacementProducts}
                   onSelectReplacement={handleSelectReplacement}
-                  onRemoveItem={() => handleRemove(outOfStockInSection[0].id)}
                   onViewCombos={() => console.log('View combos')}
                 />
               ) : null;

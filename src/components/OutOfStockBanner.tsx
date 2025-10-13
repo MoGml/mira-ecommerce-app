@@ -13,31 +13,22 @@ import { Product } from '../models/data';
 interface OutOfStockBannerProps {
   replacementProducts: Product[];
   onSelectReplacement: (product: Product) => void;
-  onRemoveItem?: () => void;
   onViewCombos?: () => void;
 }
 
 const OutOfStockBanner: React.FC<OutOfStockBannerProps> = ({
   replacementProducts,
   onSelectReplacement,
-  onRemoveItem,
   onViewCombos,
 }) => {
   return (
     <View style={styles.container}>
       {/* Error Banner */}
       <View style={styles.errorBanner}>
-        <View style={styles.errorContent}>
-          <Ionicons name="alert-circle" size={20} color="white" />
-          <Text style={styles.errorText}>
-            This item is out of stock. Please select replacement or remove it.
-          </Text>
-        </View>
-        {onRemoveItem && (
-          <TouchableOpacity style={styles.removeButton} onPress={onRemoveItem}>
-            <Ionicons name="close-circle" size={24} color="white" />
-          </TouchableOpacity>
-        )}
+        <Ionicons name="alert-circle" size={20} color="#D32F2F" />
+        <Text style={styles.errorText}>
+          This item is out of stock. Please select replacement or remove it
+        </Text>
       </View>
       
       {/* Replacement Carousel */}
@@ -107,30 +98,18 @@ const styles = StyleSheet.create({
   },
   errorBanner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FF3B30',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFEBEE',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  errorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    paddingVertical: 12,
+    gap: 10,
   },
   errorText: {
     flex: 1,
-    color: 'white',
+    color: '#D32F2F',
     fontSize: 13,
     fontWeight: '500',
-    marginLeft: 10,
     lineHeight: 18,
-  },
-  removeButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-    padding: 4,
   },
   carouselContainer: {
     paddingHorizontal: 16,
