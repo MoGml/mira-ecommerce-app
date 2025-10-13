@@ -13,10 +13,11 @@ interface AddAddressScreenProps {
 }
 
 // IMPORTANT: Replace with your actual Google Places API key
+// For production, use environment variables
 const GOOGLE_PLACES_API_KEY = Platform.select({
-  ios: 'AIzaSyA1wBN5q6PIct5UOkkAOosEhhm1x74guw4',
-  android: 'YOUR_ANDROID_GOOGLE_PLACES_API_KEY',
-  default: 'YOUR_GOOGLE_PLACES_API_KEY',
+  ios: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_IOS || 'YOUR_IOS_GOOGLE_PLACES_API_KEY',
+  android: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_ANDROID || 'YOUR_ANDROID_GOOGLE_PLACES_API_KEY',
+  default: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY_IOS || 'YOUR_GOOGLE_PLACES_API_KEY',
 });
 
 const AddAddressScreenWithPlaces: React.FC<AddAddressScreenProps> = ({

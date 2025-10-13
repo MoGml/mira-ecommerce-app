@@ -107,6 +107,17 @@ export interface CategoryGroup {
   categories: Category[];
 }
 
+// Real product images from assets
+const productImages = [
+  'https://i.imgur.com/cu2aB5V.png', // Tasali Chips
+  'https://i.imgur.com/XMLmQpy.png', // Almarai Milk
+];
+
+// Helper function to get random product image
+const getRandomProductImage = (): string => {
+  return productImages[Math.floor(Math.random() * productImages.length)];
+};
+
 export const categoryGroups: CategoryGroup[] = [
   {
     id: 'group1',
@@ -307,7 +318,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/5C6BC0/FFFFFF?text=Chips',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.5,
@@ -325,7 +336,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/2196F3/FFFFFF?text=Milk',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.2,
@@ -343,7 +354,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 16,
-    image: 'https://via.placeholder.com/150x150/5C6BC0/FFFFFF?text=Chips2',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.7,
@@ -361,7 +372,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/E3F2FD/333333?text=Yogurt',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.3,
@@ -379,7 +390,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/FFF8E1/333333?text=Cheese',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.6,
@@ -397,7 +408,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/F44336/FFFFFF?text=Tomato',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.8,
@@ -413,7 +424,7 @@ export const sampleProducts: Product[] = [
     id: 'p3e',
     name: 'Premium Dates Box',
     price: 180.50,
-    image: 'https://via.placeholder.com/150x150/8D6E63/FFFFFF?text=Dates',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.4,
@@ -431,7 +442,7 @@ export const sampleProducts: Product[] = [
     price: 180.50,
     originalPrice: 1900,
     discount: 32,
-    image: 'https://via.placeholder.com/150x150/C62828/FFFFFF?text=Sauce',
+    image: getRandomProductImage(),
     categoryId: '1',
     subCategoryId: '1-1',
     rating: 4.9,
