@@ -96,8 +96,7 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       
       {/* Quantity Controls or Out of Stock Actions */}
       {isOutOfStock ? (
-        <View style={styles.outOfStockActions}>
-          <Text style={styles.outOfStockQuantity}>{quantity}</Text>
+        <View style={styles.outOfStockActionsColumn}>
           <TouchableOpacity 
             style={styles.outOfStockTrashButton} 
             onPress={() => onRemove(item.id)}
@@ -105,18 +104,19 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
             <View style={styles.trashIconContainer}>
               <Ionicons 
                 name="trash-bin" 
-                size={26} 
+                size={22} 
                 color="#FF0000" 
               />
               <View style={styles.xMark}>
                 <Ionicons 
                   name="close" 
-                  size={12} 
+                  size={10} 
                   color="#FF0000" 
                 />
               </View>
             </View>
           </TouchableOpacity>
+          <Text style={styles.outOfStockQuantity}>{quantity}</Text>
         </View>
       ) : (
         <View style={styles.quantityControls}>
@@ -288,37 +288,38 @@ const styles = StyleSheet.create({
   },
   
   // Out of Stock Actions
-  outOfStockActions: {
+  outOfStockActionsColumn: {
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    alignSelf: 'flex-end',
-  },
-  outOfStockQuantity: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#999',
-    marginBottom: 6,
+    justifyContent: 'center',
+    marginLeft: 8,
   },
   outOfStockTrashButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#FFE8E8',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 4,
   },
   trashIconContainer: {
     position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
   },
   xMark: {
     position: 'absolute',
     top: '50%',
     left: '50%',
-    transform: [{ translateX: -6 }, { translateY: -6 }],
+    transform: [{ translateX: -5 }, { translateY: -5 }],
+  },
+  outOfStockQuantity: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#999',
   },
 });
 
