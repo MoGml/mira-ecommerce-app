@@ -1,34 +1,151 @@
-import React, { useState, useMemo } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
   Image,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import CartItemCard from '../components/CartItemCard';
 import OutOfStockBanner from '../components/OutOfStockBanner';
 import OrderAgainCarousel from '../components/OrderAgainCarousel';
-import { 
-  sampleCartItems, 
-  sampleProducts, 
+import { getBag, BagItem, BagResponse } from '../services/api';
+import {
+  sampleProducts,
   sampleAddresses,
-  CartItem,
   Product,
 } from '../models/data';
 
+// Convert BagItem to CartItem format for compatibility with existing UI
+interface CartItem {
+  id: string;
+  packId: number;
+  name: string;
+  image: string;
+  price: number;
+  originalPrice: number;
+  quantity: number;
+  uom: string;
+  uomValue: number;
+  inStock: boolean;
+  maxQty: number;
+  shipmentType: 'express' | 'scheduled';
+}
+
+function convertBagItemToCartItem(bagItem: BagItem, shipmentType: 'express' | 'scheduled'): CartItem {
+  // Ensure all required properties have valid values
+  const cartItem: CartItem = {
+    id: bagItem.packId?.toString() || '0',
+    packId: bagItem.packId || 0,
+    name: bagItem.packName || 'Unknown Product',
+    image: bagItem.pictureUrl || '',
+    price: bagItem.priceAfterDiscount || 0,
+    originalPrice: bagItem.price || 0,
+    quantity: Math.floor(bagItem.bagQty || 0),
+    uom: bagItem.unitOfMeasureName || '',
+    uomValue: bagItem.unitOfMeasureValue || 1,
+    inStock: !bagItem.itemOutOfStock,
+    maxQty: Math.floor(bagItem.maxQty || 0),
+    shipmentType,
+  };
+
+  // Log warning if critical data is missing
+  if (!bagItem.packId || !bagItem.packName) {
+    console.warn('⚠️ [BAG] Cart item missing critical data:', bagItem);
+  }
+
+  return cartItem;
+}
+
 export default function CartScreen({ navigation }: any) {
-  const { isAuthenticated, user } = useAuth();
-  const [cartItems, setCartItems] = useState<CartItem[]>(sampleCartItems);
+  const { isAuthenticated, user, logout } = useAuth();
+  const {
+    updateItemQuantity,
+    getItemQuantity,
+    isLoading: isItemLoading,
+    isPending: isItemPending,
+    cartItems: contextCartItems
+  } = useCart();
+
+  const [bagData, setBagData] = useState<BagResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [selectedAddress, setSelectedAddress] = useState(sampleAddresses[0]);
   const [deliverySlot, setDeliverySlot] = useState('8:00 PM – 10:00 PM');
   const [expressCollapsed, setExpressCollapsed] = useState(false);
   const [scheduledCollapsed, setScheduledCollapsed] = useState(false);
+
+  // Fetch bag data from server
+  const fetchBag = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      console.log('🛒 [BAG] Fetching bag data from server...');
+      const data = await getBag();
+      console.log('✅ [BAG] Bag data received:', data);
+
+      setBagData(data);
+    } catch (err: any) {
+      console.error('❌ [BAG] Error fetching bag:', err);
+      setError(err.message || 'Failed to load cart');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Fetch bag on mount and when screen is focused
+  useEffect(() => {
+    fetchBag();
+  }, [fetchBag]);
+
+  // Convert bag data to cart items with live quantities from CartContext
+  const cartItems = useMemo(() => {
+    if (!bagData) return [];
+
+    const expressItems = bagData.expressBagItems.map(item => {
+      const cartItem = convertBagItemToCartItem(item, 'express');
+      // Override with live quantity from CartContext (for optimistic updates)
+      const contextItem = contextCartItems.get(item.packId);
+      if (contextItem) {
+        cartItem.quantity = contextItem.quantity;
+      }
+      return cartItem;
+    });
+
+    const scheduledItems = bagData.tomorrowBagItems.map(item => {
+      const cartItem = convertBagItemToCartItem(item, 'scheduled');
+      // Override with live quantity from CartContext (for optimistic updates)
+      const contextItem = contextCartItems.get(item.packId);
+      if (contextItem) {
+        cartItem.quantity = contextItem.quantity;
+      }
+      return cartItem;
+    });
+
+    // Filter out items with 0 quantity (removed items)
+    const allItems = [...expressItems, ...scheduledItems];
+    return allItems.filter(item => {
+      // If item exists in context with 0 quantity, it's being removed
+      const contextItem = contextCartItems.get(item.packId);
+      return !contextItem || contextItem.quantity > 0;
+    });
+  }, [bagData, contextCartItems]);
 
   // Group cart items by shipment type
   const { expressItems, scheduledItems } = useMemo(() => {
@@ -39,38 +156,81 @@ export default function CartScreen({ navigation }: any) {
 
   const hasMultipleShipments = expressItems.length > 0 && scheduledItems.length > 0;
 
-  // Calculate subtotals
-  const calculateSubtotal = (items: CartItem[]) => {
-    return items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
-  };
-
-  const expressSubtotal = calculateSubtotal(expressItems);
-  const scheduledSubtotal = calculateSubtotal(scheduledItems);
-  const totalSubtotal = expressSubtotal + scheduledSubtotal;
+  // Use server-provided subtotals or calculate from items
+  const expressSubtotal = bagData?.expressBagSubTotal || 0;
+  const scheduledSubtotal = bagData?.tomorrowsBagSubTotal || 0;
+  const totalSubtotal = bagData?.bagSubTotal || 0;
 
   // Get out of stock items
-  const outOfStockItems = cartItems.filter(item => !item.product.inStock);
+  const outOfStockItems = cartItems.filter(item => !item.inStock);
 
-  // Cart item handlers
-  const handleIncrement = (id: string) => {
-    setCartItems(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, quantity: item.quantity + 1 } : item
-      )
+  // Check if any items are pending or loading (prevent checkout during mutations)
+  const hasAnyPendingOrLoading = useMemo(() => {
+    return cartItems.some(item =>
+      isItemLoading(item.packId) || isItemPending(item.packId)
     );
+  }, [cartItems, isItemLoading, isItemPending]);
+
+  // Cart item handlers using CartContext
+  const handleIncrement = (id: string) => {
+    const item = cartItems.find(i => i.id === id);
+    if (!item) {
+      console.error('❌ [BAG] Item not found for increment:', id);
+      return;
+    }
+
+    // Validate required properties
+    if (!item.name || item.price === undefined || !item.packId) {
+      console.error('❌ [BAG] Item missing required properties:', item);
+      return;
+    }
+
+    const newQuantity = item.quantity + 1;
+
+    // Check stock limit
+    if (newQuantity > item.maxQty) {
+      Alert.alert('Stock Limit', `Maximum quantity available is ${item.maxQty}`);
+      return;
+    }
+
+    updateItemQuantity(item.packId, newQuantity, item.maxQty, item.name, item.price);
   };
 
   const handleDecrement = (id: string) => {
-    setCartItems(prev =>
-      prev.map(item =>
-        item.id === id && item.quantity > 1
-          ? { ...item, quantity: item.quantity - 1 }
-          : item
-      )
-    );
+    const item = cartItems.find(i => i.id === id);
+    if (!item) {
+      console.error('❌ [BAG] Item not found for decrement:', id);
+      return;
+    }
+
+    // Validate required properties
+    if (!item.name || item.price === undefined || !item.packId) {
+      console.error('❌ [BAG] Item missing required properties:', item);
+      return;
+    }
+
+    const newQuantity = item.quantity - 1;
+    updateItemQuantity(item.packId, newQuantity, item.maxQty, item.name, item.price);
+
+    // Refresh bag after removing item to get updated data
+    if (newQuantity === 0) {
+      setTimeout(() => fetchBag(), 500);
+    }
   };
 
   const handleRemove = (id: string) => {
+    const item = cartItems.find(i => i.id === id);
+    if (!item) {
+      console.error('❌ [BAG] Item not found for remove:', id);
+      return;
+    }
+
+    // Validate required properties
+    if (!item.name || item.price === undefined || !item.packId) {
+      console.error('❌ [BAG] Item missing required properties:', item);
+      return;
+    }
+
     Alert.alert(
       'Remove Item',
       'Are you sure you want to remove this item from cart?',
@@ -79,7 +239,10 @@ export default function CartScreen({ navigation }: any) {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => setCartItems(prev => prev.filter(item => item.id !== id)),
+          onPress: () => {
+            updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
+            setTimeout(() => fetchBag(), 500);
+          },
         },
       ]
     );
@@ -94,29 +257,36 @@ export default function CartScreen({ navigation }: any) {
         {
           text: 'Clear',
           style: 'destructive',
-          onPress: () => setCartItems([]),
+          onPress: async () => {
+            // Remove all items using mutate
+            for (const item of cartItems) {
+              updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
+            }
+            setTimeout(() => fetchBag(), 500);
+          },
         },
       ]
     );
   };
 
   const handleSelectReplacement = (product: Product) => {
-    // Replace out of stock item with selected product
-    const outOfStockItem = outOfStockItems[0];
-    if (outOfStockItem) {
-      setCartItems(prev =>
-        prev.map(item =>
-          item.id === outOfStockItem.id
-            ? { ...item, product, productId: product.id }
-            : item
-        )
-      );
-    }
+    // TODO: Implement replacement logic with server
+    console.log('Replace with:', product);
   };
 
   const handleCheckout = (shipmentType?: 'express' | 'scheduled') => {
-    // Check if user is authenticated
-    if (!isAuthenticated || !user) {
+    // Prevent checkout if any items are pending or loading
+    if (hasAnyPendingOrLoading) {
+      Alert.alert(
+        'Please Wait',
+        'Some items are being updated. Please wait for all changes to complete before checking out.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Check if user is guest (not registered)
+    if (!user || !user.isRegistered) {
       Alert.alert(
         'Sign In Required',
         'Please sign in to proceed with checkout',
@@ -127,9 +297,11 @@ export default function CartScreen({ navigation }: any) {
           },
           {
             text: 'Sign In',
-            onPress: () => {
-              // User will be redirected to auth flow automatically
-              // You can also navigate to a specific auth screen if needed
+            onPress: async () => {
+              // Logout will clear user data and trigger navigation to AuthNavigator
+              // After successful login, user will automatically return to the app
+              // and can navigate back to cart to complete checkout
+              await logout();
             },
           },
         ]
@@ -137,13 +309,13 @@ export default function CartScreen({ navigation }: any) {
       return;
     }
 
-    const items = shipmentType 
+    const items = shipmentType
       ? (shipmentType === 'express' ? expressItems : scheduledItems)
       : cartItems;
-    
+
     // Check if there are any out-of-stock items
-    const outOfStockInItems = items.filter(item => !item.product.inStock);
-    
+    const outOfStockInItems = items.filter(item => !item.inStock);
+
     if (outOfStockInItems.length > 0) {
       Alert.alert(
         'Out of Stock Items',
@@ -156,24 +328,27 @@ export default function CartScreen({ navigation }: any) {
           {
             text: 'Remove & Continue',
             style: 'destructive',
-            onPress: () => {
-              // Remove out-of-stock items from cart
-              const updatedCartItems = cartItems.filter(item => item.product.inStock);
-              setCartItems(updatedCartItems);
-              
-              // Filter items for checkout (only in-stock)
-              const checkoutItems = items.filter(item => item.product.inStock);
-              
-              if (checkoutItems.length > 0) {
-                navigation.navigate('Checkout', { cartItems: checkoutItems, shipmentType });
+            onPress: async () => {
+              // Remove out-of-stock items from server
+              for (const item of outOfStockInItems) {
+                updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
               }
-              // No alert if cart becomes empty - user will see empty state
+
+              // Filter items for checkout (only in-stock)
+              const checkoutItems = items.filter(item => item.inStock);
+
+              if (checkoutItems.length > 0) {
+                navigation.navigate('Checkout', { cartItems: checkoutItems, shipmentType, bagData });
+              }
+
+              // Refresh bag data
+              setTimeout(() => fetchBag(), 500);
             },
           },
         ]
       );
     } else {
-      navigation.navigate('Checkout', { cartItems: items, shipmentType });
+      navigation.navigate('Checkout', { cartItems: items, shipmentType, bagData });
     }
   };
 
@@ -181,7 +356,7 @@ export default function CartScreen({ navigation }: any) {
 
   // Replacement products (in stock items from same category)
   const replacementProducts = sampleProducts
-    .filter(p => p.inStock && p.categoryId === outOfStockItems[0]?.product.categoryId)
+    .filter(p => p.inStock)
     .slice(0, 5);
 
   const renderShipmentSection = (
@@ -244,22 +419,22 @@ export default function CartScreen({ navigation }: any) {
               </View>
             </View>
             
-            <ScrollView 
-              horizontal 
+            <ScrollView
+              horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.collapsedProducts}
             >
               {items.map((item) => (
                 <View key={item.id} style={styles.collapsedProductCard}>
-                  <Image 
-                    source={{ uri: item.product.image }} 
+                  <Image
+                    source={{ uri: item.image }}
                     style={styles.collapsedProductImage}
                   />
                   <Text style={styles.collapsedProductName} numberOfLines={1}>
-                    {item.product.name}
+                    {item.name}
                   </Text>
                   <Text style={styles.collapsedProductPrice}>
-                    LE {item.product.price.toFixed(2)}
+                    LE {item.price.toFixed(2)}
                   </Text>
                   <Text style={styles.collapsedProductQty}>
                     Qty: {item.quantity}
@@ -268,18 +443,27 @@ export default function CartScreen({ navigation }: any) {
               ))}
             </ScrollView>
 
-            <View style={styles.collapsedFooter}>
-              <View style={styles.collapsedSubtotalInline}>
-                <Text style={styles.collapsedSubtotalLabel}>Subtotal:</Text>
-                <Text style={styles.collapsedSubtotalValue}>EGP {subtotal.toFixed(0)}</Text>
+            {/* Collapsed Footer - Only show for multi-shipment */}
+            {hasMultipleShipments && (
+              <View style={styles.collapsedFooter}>
+                <View style={styles.collapsedSubtotalInline}>
+                  <Text style={styles.collapsedSubtotalLabel}>Subtotal:</Text>
+                  <Text style={styles.collapsedSubtotalValue}>EGP {subtotal.toFixed(0)}</Text>
+                </View>
+                <TouchableOpacity
+                  style={[
+                    styles.collapsedCheckoutButton,
+                    hasAnyPendingOrLoading && styles.disabledButton
+                  ]}
+                  onPress={() => handleCheckout(shipmentType)}
+                  disabled={hasAnyPendingOrLoading}
+                >
+                  <Text style={styles.collapsedCheckoutButtonText}>
+                    {hasAnyPendingOrLoading ? 'Updating...' : 'Checkout'}
+                  </Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.collapsedCheckoutButton}
-                onPress={() => handleCheckout(shipmentType)}
-              >
-                <Text style={styles.collapsedCheckoutButtonText}>Checkout</Text>
-              </TouchableOpacity>
-            </View>
+            )}
           </View>
         )}
 
@@ -316,13 +500,15 @@ export default function CartScreen({ navigation }: any) {
                   onDecrement={handleDecrement}
                   onRemove={handleRemove}
                   onEditOptions={(id) => console.log('Edit options:', id)}
+                  isLoading={isItemLoading(item.packId)}
+                  isPending={isItemPending(item.packId)}
                 />
               ))}
             </View>
 
             {/* Out of Stock Banner */}
             {(() => {
-              const outOfStockInSection = items.filter(item => !item.product.inStock);
+              const outOfStockInSection = items.filter(item => !item.inStock);
               return outOfStockInSection.length > 0 ? (
                 <OutOfStockBanner
                   replacementProducts={replacementProducts}
@@ -332,29 +518,67 @@ export default function CartScreen({ navigation }: any) {
               ) : null;
             })()}
 
-            {/* Subtotal and Checkout - Single Row */}
-            <View style={styles.shipmentFooter}>
-              <View style={styles.subtotalInline}>
-                <Text style={styles.subtotalInlineLabel}>Subtotal:</Text>
-                <Text style={styles.subtotalInlineValue}>EGP {subtotal.toFixed(0)}</Text>
-              </View>
+            {/* Subtotal and Checkout - Only show for multi-shipment */}
+            {hasMultipleShipments && (
+              <View style={styles.shipmentFooter}>
+                <View style={styles.subtotalInline}>
+                  <Text style={styles.subtotalInlineLabel}>Subtotal:</Text>
+                  <Text style={styles.subtotalInlineValue}>EGP {subtotal.toFixed(0)}</Text>
+                </View>
 
-              {/* Checkout Button (for multi-shipment) */}
-              {hasMultipleShipments && (
+                {/* Checkout Button (for multi-shipment) */}
                 <TouchableOpacity
-                  style={styles.sectionCheckoutButton}
+                  style={[
+                    styles.sectionCheckoutButton,
+                    hasAnyPendingOrLoading && styles.disabledButton
+                  ]}
                   onPress={() => handleCheckout(shipmentType)}
+                  disabled={hasAnyPendingOrLoading}
                 >
-                  <Text style={styles.sectionCheckoutButtonText}>Checkout</Text>
+                  <Text style={styles.sectionCheckoutButtonText}>
+                    {hasAnyPendingOrLoading ? 'Updating...' : 'Checkout'}
+                  </Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              </View>
+            )}
           </>
         )}
       </View>
     );
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF0000" />
+          <Text style={styles.loadingText}>Loading your cart...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={80} color="#FF6B6B" />
+          <Text style={styles.errorTitle}>Failed to Load Cart</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={() => fetchBag()}
+          >
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Empty cart state
   if (cartItems.length === 0) {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
@@ -384,10 +608,18 @@ export default function CartScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => fetchBag(true)}
+              tintColor="#FF0000"
+              colors={['#FF0000']}
+            />
+          }
         >
           {/* Address Section */}
           <TouchableOpacity style={styles.addressSection}>
@@ -435,11 +667,19 @@ export default function CartScreen({ navigation }: any) {
             <Text style={styles.footerSubtotalLabel}>Subtotal</Text>
           </View>
           <TouchableOpacity
-            style={styles.checkoutButton}
+            style={[
+              styles.checkoutButton,
+              hasAnyPendingOrLoading && styles.disabledButton
+            ]}
             onPress={() => handleCheckout()}
+            disabled={hasAnyPendingOrLoading}
           >
             <Text style={styles.checkoutButtonText}>
-              {hasMultipleShipments ? 'Checkout all' : 'Checkout'}
+              {hasAnyPendingOrLoading
+                ? 'Updating cart...'
+                : hasMultipleShipments
+                ? 'Checkout all'
+                : 'Checkout'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -682,6 +922,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'white',
   },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+    opacity: 0.6,
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -807,6 +1051,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   collapsedCheckoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: 'white',
+  },
+  // Loading state styles
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  // Error state styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    backgroundColor: '#FFFFFF',
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#FF0000',
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderRadius: 8,
+  },
+  retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: 'white',

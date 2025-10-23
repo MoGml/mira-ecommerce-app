@@ -8,7 +8,7 @@ interface OTPVerificationScreenProps {
   phone: string;
   isRegistered: boolean;
   userName?: string;
-  onVerified: (isNewUser: boolean) => void;
+  onVerified: (isNewUser: boolean, needsAddressSetup?: boolean) => void;
   onBack: () => void;
 }
 
@@ -96,7 +96,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       const result = await login(phone, code);
       
       if (result.success) {
-        onVerified(result.isNewUser);
+        onVerified(result.isNewUser, result.needsAddressSetup);
       } else {
         Alert.alert('Invalid Code', result.error || 'The code you entered is incorrect');
         setOtp(['', '', '', '']);

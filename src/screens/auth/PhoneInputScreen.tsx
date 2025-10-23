@@ -7,9 +7,10 @@ import { useAuth } from '../../context/AuthContext';
 interface PhoneInputScreenProps {
   onNext: (phone: string, isRegistered: boolean, userName?: string) => void;
   onBack: () => void;
+  onSkip: () => void;
 }
 
-const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ onNext, onBack }) => {
+const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ onNext, onBack, onSkip }) => {
   const { checkPhoneNumber } = useAuth();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -94,24 +95,16 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ onNext, onBack }) =
           )}
         </TouchableOpacity>
 
-        <Text style={styles.orText}>or</Text>
-
-        {/* Social Login */}
+        {/* Skip as Guest */}
         <TouchableOpacity
-          style={styles.socialButton}
-          onPress={() => handleSocialLogin('apple')}
+          style={styles.skipGuestButton}
+          onPress={onSkip}
+          disabled={isLoading}
         >
-          <Ionicons name="logo-apple" size={20} color="#000" />
-          <Text style={styles.socialButtonText}>Continue with Apple</Text>
+          <Text style={styles.skipGuestText}>Skip for now</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.socialButton}
-          onPress={() => handleSocialLogin('google')}
-        >
-          <Ionicons name="logo-google" size={20} color="#000" />
-          <Text style={styles.socialButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
+        {/* Social login disabled for now */}
 
         <Text style={styles.termsText}>
           By using mira, you agree to the{'\n'}
@@ -209,29 +202,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  skipGuestButton: {
+    alignItems: 'center',
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  skipGuestText: {
+    color: '#FF0000',
+    fontSize: 14,
+    fontWeight: '600',
+  },
   orText: {
     textAlign: 'center',
     color: '#999',
     fontSize: 14,
     marginBottom: 16,
   },
-  socialButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  socialButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#333',
-    marginLeft: 12,
-  },
+  // socialButton styles removed while social login is disabled
   termsText: {
     textAlign: 'center',
     color: '#999',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,11 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { categoryGroups } from '../models/data';
+import { getCategories, Category } from '../services/api';
 
 // Mira Logo Component for placeholders
 const MiraLogo = ({ size = 40 }: { size?: number }) => (
@@ -21,7 +22,7 @@ const MiraLogo = ({ size = 40 }: { size?: number }) => (
         <Text style={styles.logoM}>M</Text>
       </View>
     </View>
-    <Text style={[styles.logoText, { fontSize: size * 0.3 }]}>ira</Text>
+    <Text style={[styles.logoText, { fontSize: Math.round(size * 0.3) }]}>ira</Text>
   </View>
 );
 
@@ -34,39 +35,104 @@ const CategorySkeleton = () => (
 );
 
 export default function CategoriesScreen({ navigation }: any) {
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
-  // Simulate loading
-  React.useEffect(() => {
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+  useEffect(() => {
+    loadCategories();
   }, []);
 
-  const handleCategoryPress = (categoryId: string, categoryName: string) => {
-    navigation.navigate('SubCategories', { categoryId, categoryName });
+  const loadCategories = async () => {
+    // Prevent multiple simultaneous requests (but allow initial load)
+    if (isLoading && !isRetrying && hasLoaded) {
+      console.log('🚫 [CATEGORIES] Request already in progress, skipping duplicate request');
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setIsRetrying(false);
+      
+      console.log('🌐 [CATEGORIES] Loading categories');
+      const data = await getCategories();
+      console.log('✅ [CATEGORIES] API response received:', data);
+      setCategories(Array.isArray(data) ? data : []);
+      setRetryCount(0); // Reset retry count on successful load
+      setHasLoaded(true); // Mark as loaded to enable duplicate request prevention
+    } catch (err: any) {
+      console.error('❌ [CATEGORIES] Error loading categories:', err);
+      setError(`Failed to load categories. ${err.message || 'Please try again.'}`);
+      setCategories([]); // Set empty array on error
+      
+      // Only show alert if this is not a retry attempt
+      if (!isRetrying) {
+        Alert.alert(
+          'Connection Error', 
+          'Unable to load categories. Please check your internet connection and try again.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Retry', onPress: () => handleRetry() }
+          ]
+        );
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const renderCategoryCard = (category: any) => (
+  // Handle retry logic
+  const handleRetry = async () => {
+    if (isLoading) return;
+    
+    setIsRetrying(true);
+    setRetryCount(prev => prev + 1);
+    
+    try {
+      await loadCategories();
+    } catch (err) {
+      console.error('❌ [CATEGORIES] Retry failed:', err);
+    }
+  };
+
+  const handleCategoryPress = (categoryId: string, categoryName: string) => {
+    // Navigate to SubCategories with "All" selected (no specific subcategory)
+    navigation.navigate('SubCategories', { 
+      categoryId: parseInt(categoryId), 
+      categoryName,
+      selectedSubCategoryId: null 
+    });
+  };
+
+  const handleSubCategoryPress = (categoryId: string, categoryName: string, subCategoryId: string, subCategoryName: string) => {
+    // Navigate to SubCategories with specific subcategory selected
+    navigation.navigate('SubCategories', { 
+      categoryId: parseInt(categoryId), 
+      categoryName,
+      selectedSubCategoryId: parseInt(subCategoryId)
+    });
+  };
+
+  const renderCategoryCard = (category: Category) => (
     <TouchableOpacity
       key={category.id}
       style={styles.categoryCard}
-      onPress={() => handleCategoryPress(category.id, category.name)}
+      onPress={() => handleCategoryPress(category.id.toString(), category.name)}
     >
-      <Image 
-        source={{ uri: category.image }} 
-        style={styles.categoryImage}
-        onError={() => <MiraLogo size={60} />}
-      />
+      <MiraLogo size={60} />
       <Text style={styles.categoryName}>{category.name}</Text>
     </TouchableOpacity>
   );
 
-  const renderCategoryGroup = (group: any) => (
-    <View key={group.id} style={styles.categoryGroup}>
+  const renderCategoryGroup = (category: Category) => (
+    <View key={category.id} style={styles.categoryGroup}>
       <View style={styles.groupHeader}>
-        <Text style={styles.groupTitle}>{group.title}</Text>
-        <TouchableOpacity>
+        <Text style={styles.groupTitle}>{category.name}</Text>
+        <TouchableOpacity onPress={() => handleCategoryPress(category.id.toString(), category.name)}>
           <Text style={styles.seeAllText}>See all</Text>
         </TouchableOpacity>
       </View>
@@ -81,11 +147,45 @@ export default function CategoriesScreen({ navigation }: any) {
             <CategorySkeleton key={index} />
           ))
         ) : (
-          group.categories.map(renderCategoryCard)
+          category.subCategories.map((subCategory) => (
+            <TouchableOpacity
+              key={subCategory.id}
+              style={styles.categoryCard}
+              onPress={() => handleSubCategoryPress(category.id.toString(), category.name, subCategory.id.toString(), subCategory.name)}
+            >
+              <MiraLogo size={60} />
+              <Text style={styles.categoryName}>{subCategory.name}</Text>
+            </TouchableOpacity>
+          ))
         )}
       </ScrollView>
     </View>
   );
+
+  if (error && !isLoading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="cloud-offline-outline" size={64} color="#FF6B6B" />
+          <Text style={styles.errorTitle}>Connection Error</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.retryButton}
+            onPress={handleRetry}
+            disabled={isLoading}
+          >
+            <Ionicons name="refresh" size={20} color="#FFFFFF" />
+            <Text style={styles.retryButtonText}>
+              {isLoading ? 'Retrying...' : 'Try Again'}
+            </Text>
+          </TouchableOpacity>
+          {retryCount > 0 && (
+            <Text style={styles.retryCount}>Retry attempt: {retryCount}</Text>
+          )}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -101,7 +201,33 @@ export default function CategoriesScreen({ navigation }: any) {
 
       {/* Category Groups */}
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {categoryGroups.map(renderCategoryGroup)}
+        {isLoading && !hasLoaded ? (
+          // Show loading skeleton for initial load
+          Array.from({ length: 3 }).map((_, index) => (
+            <View key={index} style={styles.categoryGroup}>
+              <View style={styles.groupHeader}>
+                <View style={styles.skeletonText} />
+                <View style={styles.skeletonText} />
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.categoriesScroll}
+                contentContainerStyle={styles.categoriesContent}
+              >
+                {Array.from({ length: 4 }).map((_, subIndex) => (
+                  <CategorySkeleton key={subIndex} />
+                ))}
+              </ScrollView>
+            </View>
+          ))
+        ) : categories && categories.length > 0 ? (
+          categories.map(renderCategoryGroup)
+        ) : !isLoading ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No categories available</Text>
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -239,5 +365,60 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FF0000',
     marginTop: 2,
+  },
+  // Error handling styles
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+    paddingVertical: 40,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF0000',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  retryCount: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  // Empty state styles
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });

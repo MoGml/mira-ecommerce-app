@@ -60,6 +60,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Mira uses your location to determine delivery coverage and to deliver your orders.",
+          "isIosBackgroundLocationEnabled": true
+        }
+      ],
       "expo-tracking-transparency"
     ],
     "extra": {

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AUTH_STATUS_KEY, AUTH_TOKEN_KEY, login as apiLogin, LoginRequest, Address } from '../services/api';
+import { AppState } from 'react-native';
 
 export interface User {
   id: string;
@@ -8,17 +10,24 @@ export interface User {
   phone: string;
   avatar?: string;
   walletBalance?: number;
+  points?: number;
   isRegistered: boolean;
+  selectedAddress?: Address | null;
 }
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (phone: string, otp: string) => Promise<{ success: boolean; isNewUser: boolean; error?: string }>;
+  needsAddressSetup: boolean;
+  login: (phone: string, otp: string) => Promise<{ success: boolean; isNewUser: boolean; error?: string; needsAddressSetup?: boolean }>;
   register: (name: string, email: string, phone: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   checkPhoneNumber: (phone: string) => Promise<{ exists: boolean; userName?: string }>;
+  completeGuestFlow: () => Promise<void>;
+  updateSelectedAddress: (address: Address) => Promise<void>;
+  refreshUser: () => Promise<void>;
+  markAddressSetupComplete: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -42,17 +51,50 @@ const VALID_OTP = '1111';
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [needsAddressSetup, setNeedsAddressSetup] = useState(false);
 
   // Load user from storage on mount
   useEffect(() => {
     loadUser();
   }, []);
 
+  // Handle app state changes to check address validation
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState: string) => {
+      if (nextAppState === 'active' && user?.isRegistered) {
+        // App became active - check if user needs address setup
+        if (!user.selectedAddress) {
+          setNeedsAddressSetup(true);
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [user]);
+
   const loadUser = async () => {
     try {
       const userData = await AsyncStorage.getItem(STORAGE_KEY);
+      const authStatus = await AsyncStorage.getItem(AUTH_STATUS_KEY);
+      
       if (userData) {
-        setUser(JSON.parse(userData));
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+        
+        // Check if logged-in user needs address setup
+        if (parsedUser.isRegistered && !parsedUser.selectedAddress) {
+          setNeedsAddressSetup(true);
+        }
+      } else if (authStatus === 'guest') {
+        // Guest user - create a guest user object
+        const guestUser: User = {
+          id: 'guest',
+          name: 'Guest User',
+          phone: '',
+          isRegistered: false,
+        };
+        setUser(guestUser);
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -85,32 +127,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return { exists: false };
   };
 
-  const login = async (phone: string, otp: string): Promise<{ success: boolean; isNewUser: boolean; error?: string }> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+  const login = async (phone: string, otp: string): Promise<{ success: boolean; isNewUser: boolean; error?: string; needsAddressSetup?: boolean }> => {
+    try {
+      // Extract country code and phone number
+      // Assuming phone format like "01019233560" (Egypt)
+      const countryCode = 20; // Egypt country code - can be made dynamic later
+      const phoneNumber = phone.startsWith('0') ? phone.substring(1) : phone;
 
-    if (otp !== VALID_OTP) {
+      // Prepare login request
+      const loginRequest: LoginRequest = {
+        fcmToken: 'temp_fcm_token', // TODO: Replace with real FCM token from Firebase
+        idToken: otp, // Using OTP as idToken for now
+        phoneNumber: phoneNumber,
+        countryCode: countryCode,
+      };
+
+      console.log('🔐 [AUTH] Logging in with:', { phoneNumber, countryCode });
+
+      const response = await apiLogin(loginRequest);
+
+      console.log('✅ [AUTH] Login successful:', response);
+
+      // Store auth token
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
+
+      // Create user object from response
+      const loggedInUser: User = {
+        id: response.customerId.toString(),
+        name: response.displayName,
+        phone: response.phoneNumber,
+        walletBalance: response.wallet,
+        points: response.points,
+        isRegistered: true,
+        selectedAddress: response.selectedAddress,
+      };
+
+      await saveUser(loggedInUser);
+
+      // Check if user needs address setup
+      const needsAddress = !response.selectedAddress;
+      if (needsAddress) {
+        setNeedsAddressSetup(true);
+      }
+
+      return {
+        success: true,
+        isNewUser: false, // API handles registration, so all successful logins are existing users
+        needsAddressSetup: needsAddress,
+      };
+    } catch (error: any) {
+      console.error('❌ [AUTH] Login failed:', error);
       return {
         success: false,
         isNewUser: false,
-        error: 'Invalid OTP code',
-      };
-    }
-
-    const registeredUser = REGISTERED_USERS[phone];
-    
-    if (registeredUser) {
-      // Existing user
-      await saveUser(registeredUser);
-      return {
-        success: true,
-        isNewUser: false,
-      };
-    } else {
-      // New user - return success but indicate they need to complete profile
-      return {
-        success: true,
-        isNewUser: true,
+        error: error.message || 'Login failed. Please try again.',
       };
     }
   };
@@ -136,10 +206,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
+      await AsyncStorage.removeItem(AUTH_STATUS_KEY);
+      await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       setUser(null);
+      setNeedsAddressSetup(false);
     } catch (error) {
       console.error('Error logging out:', error);
     }
+  };
+
+  const completeGuestFlow = async () => {
+    try {
+      await AsyncStorage.setItem(AUTH_STATUS_KEY, 'guest');
+      const guestUser: User = {
+        id: 'guest',
+        name: 'Guest User',
+        phone: '',
+        isRegistered: false,
+      };
+      setUser(guestUser);
+    } catch (error) {
+      console.error('Error completing guest flow:', error);
+    }
+  };
+
+  const updateSelectedAddress = async (address: Address) => {
+    if (!user) return;
+
+    try {
+      const updatedUser: User = {
+        ...user,
+        selectedAddress: address,
+      };
+      await saveUser(updatedUser);
+      setNeedsAddressSetup(false); // Address setup is now complete
+    } catch (error) {
+      console.error('Error updating selected address:', error);
+    }
+  };
+
+  const markAddressSetupComplete = () => {
+    setNeedsAddressSetup(false);
+  };
+
+  const refreshUser = async () => {
+    await loadUser();
   };
 
   return (
@@ -148,10 +259,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         isAuthenticated: !!user,
         isLoading,
+        needsAddressSetup,
         login,
         register,
         logout,
         checkPhoneNumber,
+        completeGuestFlow,
+        updateSelectedAddress,
+        refreshUser,
+        markAddressSetupComplete,
       }}
     >
       {children}

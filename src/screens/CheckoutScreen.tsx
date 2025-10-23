@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,15 @@ import {
   TextInput,
   Switch,
   Alert,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AddressCard from '../components/AddressCard';
 import PaymentMethodCard from '../components/PaymentMethodCard';
 import PromoCodeInput from '../components/PromoCodeInput';
+import { getCheckoutDetails, CheckoutDetailsResponse } from '../services/api';
 import {
   sampleAddresses,
   samplePaymentMethods,
@@ -24,7 +27,13 @@ import {
 
 export default function CheckoutScreen({ route, navigation }: any) {
   const { cartItems = [] } = route.params || {};
-  
+
+  // Server checkout data
+  const [checkoutData, setCheckoutData] = useState<CheckoutDetailsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
   const [selectedAddress, setSelectedAddress] = useState(sampleAddresses[0]);
   const [receiverName, setReceiverName] = useState(sampleUser.name);
   const [receiverPhone, setReceiverPhone] = useState(sampleUser.phone || '');
@@ -35,11 +44,62 @@ export default function CheckoutScreen({ route, navigation }: any) {
   const [deliveryTip, setDeliveryTip] = useState(0);
   const [customTip, setCustomTip] = useState('');
 
-  // Group items by shipment type
+  // Fetch checkout details from server
+  const fetchCheckoutDetails = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+      setError(null);
+
+      console.log('🛒 [CHECKOUT] Fetching checkout details from server...');
+      const data = await getCheckoutDetails();
+      console.log('✅ [CHECKOUT] Checkout details received:', data);
+
+      setCheckoutData(data);
+    } catch (err: any) {
+      console.error('❌ [CHECKOUT] Error fetching checkout details:', err);
+      setError(err.message || 'Failed to load checkout details');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
+
+  // Fetch checkout details on mount
+  useEffect(() => {
+    fetchCheckoutDetails();
+  }, [fetchCheckoutDetails]);
+
+  // Use server shipments if available, otherwise fall back to client-side grouping
   const shipmentGroups = useMemo(() => {
+    // If we have server data, use it
+    if (checkoutData?.value?.shipments) {
+      return checkoutData.value.shipments.map((shipment) => ({
+        id: shipment.shipmentId.toString(),
+        type: shipment.shipmentName.toLowerCase() === 'express' ? 'express' as const : 'scheduled' as const,
+        label: shipment.shipmentName === 'Express' ? 'Get it Today' : 'Get it Tomorrow',
+        items: shipment.items.map((item) => ({
+          id: item.packagingId.toString(),
+          packId: item.packagingId,
+          name: item.name,
+          quantity: Math.floor(item.quantity),
+          price: item.pricePerUnitAfterDiscount,
+          originalPrice: item.pricePerUnit,
+        })),
+        deliveryFee: shipment.deliveryCost,
+        subtotal: shipment.subtotal,
+        total: shipment.total,
+        outletName: shipment.outletName,
+      }));
+    }
+
+    // Fallback to client-side grouping (from passed cartItems)
     const expressItems = cartItems.filter((item: CartItem) => item.shipmentType === 'express');
     const scheduledItems = cartItems.filter((item: CartItem) => item.shipmentType === 'scheduled');
-    
+
     const groups = [];
     if (expressItems.length > 0) {
       groups.push({
@@ -60,18 +120,21 @@ export default function CheckoutScreen({ route, navigation }: any) {
       });
     }
     return groups;
-  }, [cartItems]);
+  }, [checkoutData, cartItems]);
 
   const hasMultipleShipments = shipmentGroups.length > 1;
 
-  // Calculate totals
-  const subtotal = cartItems.reduce(
-    (sum: number, item: CartItem) => sum + item.product.price * item.quantity,
+  // Calculate totals - use server data if available
+  const subtotal = checkoutData?.value?.subtotal || cartItems.reduce(
+    (sum: number, item: CartItem) => {
+      const price = item.price || item.product?.price || 0;
+      return sum + price * item.quantity;
+    },
     0
   );
-  const totalDeliveryFees = shipmentGroups.reduce((sum, group) => sum + group.deliveryFee, 0);
+  const totalDeliveryFees = checkoutData?.value?.delivery || shipmentGroups.reduce((sum, group) => sum + group.deliveryFee, 0);
   const walletDeduction = useWallet ? Math.min(sampleUser.walletBalance || 0, subtotal) : 0;
-  const total = subtotal + totalDeliveryFees - promoDiscount - walletDeduction + deliveryTip;
+  const total = checkoutData?.value?.total || (subtotal + totalDeliveryFees - promoDiscount - walletDeduction + deliveryTip);
 
   const handleApplyPromo = (code: string) => {
     // Mock promo code validation
@@ -143,19 +206,22 @@ export default function CheckoutScreen({ route, navigation }: any) {
           <View style={styles.shipmentContent}>
             {/* Product Previews */}
             <View style={styles.productPreviews}>
-              {group.items.slice(0, 3).map((item: CartItem) => (
-                <View key={item.id} style={styles.productPreview}>
-                  <Image
-                    source={{ uri: item.product.image }}
-                    style={styles.previewImage}
-                  />
-                  {item.quantity > 1 && (
-                    <View style={styles.quantityBadge}>
-                      <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
+              {group.items.slice(0, 3).map((item: CartItem) => {
+                const image = item.image || item.product?.image || '';
+                return (
+                  <View key={item.id} style={styles.productPreview}>
+                    <Image
+                      source={{ uri: image }}
+                      style={styles.previewImage}
+                    />
+                    {item.quantity > 1 && (
+                      <View style={styles.quantityBadge}>
+                        <Text style={styles.quantityBadgeText}>{item.quantity}</Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
               {group.items.length > 3 && (
                 <View style={styles.moreProductsBadge}>
                   <Text style={styles.moreProductsText}>
@@ -167,16 +233,20 @@ export default function CheckoutScreen({ route, navigation }: any) {
 
             {/* Items List */}
             <View style={styles.itemsList}>
-              {group.items.map((item: CartItem) => (
-                <View key={item.id} style={styles.checkoutItem}>
-                  <Text style={styles.checkoutItemName} numberOfLines={1}>
-                    {item.quantity}x {item.product.name}
-                  </Text>
-                  <Text style={styles.checkoutItemPrice}>
-                    LE {(item.product.price * item.quantity).toFixed(2)}
-                  </Text>
-                </View>
-              ))}
+              {group.items.map((item: CartItem) => {
+                const name = item.name || item.product?.name || 'Unknown Product';
+                const price = item.price || item.product?.price || 0;
+                return (
+                  <View key={item.id} style={styles.checkoutItem}>
+                    <Text style={styles.checkoutItemName} numberOfLines={1}>
+                      {item.quantity}x {name}
+                    </Text>
+                    <Text style={styles.checkoutItemPrice}>
+                      LE {(price * item.quantity).toFixed(2)}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}

@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../context/AuthContext';
+import { useAddress } from '../context/AddressContext';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';
@@ -13,6 +15,7 @@ import CheckoutScreen from '../screens/CheckoutScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import DiscountsScreen from '../screens/DiscountsScreen';
 import SavedAddressesScreen from '../screens/profile/SavedAddressesScreen';
+import AddAddressScreenWithPlaces from '../screens/location/AddAddressScreenWithPlaces';
 
 // Types
 export type RootTabParamList = {
@@ -21,6 +24,11 @@ export type RootTabParamList = {
   Discounts?: undefined; // Optional tab
   Bag: undefined;
   Profile: undefined;
+};
+
+export type HomeStackParamList = {
+  HomeMain: undefined;
+  AddAddress: undefined;
 };
 
 export type CategoriesStackParamList = {
@@ -46,9 +54,28 @@ export type ProfileStackParamList = {
 };
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
+const HomeStack = createStackNavigator<HomeStackParamList>();
 const CategoriesStack = createStackNavigator<CategoriesStackParamList>();
 const BagStack = createStackNavigator<BagStackParamList>();
 const ProfileStack = createStackNavigator<ProfileStackParamList>();
+
+// Home Stack Navigator
+function HomeStackNavigator() {
+  return (
+    <HomeStack.Navigator>
+      <HomeStack.Screen 
+        name="HomeMain" 
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <HomeStack.Screen 
+        name="AddAddress" 
+        component={AddAddressScreenWithPlaces}
+        options={{ headerShown: false }}
+      />
+    </HomeStack.Navigator>
+  );
+}
 
 // Categories Stack Navigator
 function CategoriesStackNavigator() {
@@ -116,13 +143,27 @@ const BagIcon = ({ focused, color, size }: { focused: boolean; color: string; si
   );
 };
 
+// Address Setup Handler Component
+function AddressSetupHandler({ children }: { children: React.ReactNode }) {
+  const { user, needsAddressSetup } = useAuth();
+  const { selectedAddress, isLoading: addressLoading } = useAddress();
+
+  useEffect(() => {
+    // This effect will be handled by the navigation logic in the screens
+    // We'll let the individual screens handle the redirect logic
+  }, [user, needsAddressSetup, selectedAddress, addressLoading]);
+
+  return <>{children}</>;
+}
+
 // Main Tab Navigator
 export default function AppNavigator() {
   const showDiscountsTab = false; // This will be controlled by API call later
 
   return (
     <NavigationContainer>
-      <Tab.Navigator
+      <AddressSetupHandler>
+        <Tab.Navigator
         screenOptions={({ route }) => ({
           tabBarIcon: ({ focused, color, size }) => {
             if (route.name === 'Bag') {
@@ -166,8 +207,8 @@ export default function AppNavigator() {
       >
         <Tab.Screen 
           name="Home" 
-          component={HomeScreen}
-          options={{ title: 'Home' }}
+          component={HomeStackNavigator}
+          options={{ headerShown: false }}
         />
         <Tab.Screen 
           name="Categories" 
@@ -192,6 +233,7 @@ export default function AppNavigator() {
           options={{ headerShown: false }}
         />
       </Tab.Navigator>
+      </AddressSetupHandler>
     </NavigationContainer>
   );
 }

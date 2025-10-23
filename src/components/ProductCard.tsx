@@ -6,15 +6,17 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useCart } from '../context/CartContext';
 
 const { width } = Dimensions.get('window');
 
 interface ProductCardProps {
   id: string;
-  name: string;
-  image: string;
+  name: string | undefined;
+  image: string | undefined;
   price: number;
   originalPrice?: number;
   discount?: number;
@@ -29,6 +31,9 @@ interface ProductCardProps {
   uom?: string; // Unit of measure (KG, Piece, Pack, etc.)
   uomValue?: number; // Value (1, 2, 500, etc.)
   promotionalMessages?: string[]; // Array of promotional messages
+  bagQuantity?: number; // Quantity of this item in the user's bag/cart
+  packagingId?: number; // Required for cart operations
+  stockQty?: number; // Required for stock validation
   onPress?: () => void;
   onAddToCart?: () => void;
   onNotify?: () => void;
@@ -53,14 +58,27 @@ const ProductCard: React.FC<ProductCardProps> = ({
   uom,
   uomValue,
   promotionalMessages = [],
+  bagQuantity,
+  packagingId,
+  stockQty = 0,
   onPress,
   onAddToCart,
   onNotify,
   variant = 'grid',
 }) => {
-  const [quantity, setQuantity] = useState(1);
-  const [isInCart, setIsInCart] = useState(false);
+  const { updateItemQuantity, getItemQuantity, isLoading, isPending, hasError } = useCart();
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
+
+  // Get current quantity from cart context
+  // PRIORITY: Cart context (live updates) > bagQuantity prop (stale from API)
+  const cartQuantity = packagingId ? getItemQuantity(packagingId) : 0;
+  const currentQuantity = cartQuantity > 0 ? cartQuantity : (bagQuantity || 0);
+  const isItemInCart = currentQuantity > 0;
+
+  // Check if this item is currently loading, pending, or has an error
+  const isItemLoading = packagingId ? isLoading(packagingId) : false;
+  const isItemPending = packagingId ? isPending(packagingId) : false;
+  const hasItemError = packagingId ? hasError(packagingId) : false;
   
   // Cycle through promotional messages every 3 seconds
   React.useEffect(() => {
@@ -75,23 +93,44 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }, [promotionalMessages]);
 
   const handleAddToCart = () => {
+    if (!packagingId || !name) return;
+    
     if (onAddToCart) {
       onAddToCart();
     }
-    setIsInCart(true);
+    
+    // Add item to cart with quantity 1
+    updateItemQuantity(packagingId, 1, stockQty, name, price);
   };
 
   const incrementQuantity = () => {
-    setQuantity(prev => prev + 1);
+    if (!packagingId || !name) return;
+    
+    const newQuantity = currentQuantity + 1;
+    
+    // STOCK LIMIT RULE: Check if we would exceed stock
+    if (newQuantity > stockQty) {
+      console.warn(`🚫 [PRODUCT] Cannot add more than ${stockQty} items (stock limit)`);
+      return;
+    }
+    
+    console.log(`➕ [PRODUCT] Incrementing ${packagingId} from ${currentQuantity} to ${newQuantity}`);
+    updateItemQuantity(packagingId, newQuantity, stockQty, name, price);
   };
 
   const decrementQuantity = () => {
-    if (quantity > 1) {
-      setQuantity(prev => prev - 1);
+    if (!packagingId || !name) return;
+    
+    const newQuantity = currentQuantity - 1;
+    
+    console.log(`➖ [PRODUCT] Decrementing ${packagingId} from ${currentQuantity} to ${newQuantity}`);
+    
+    if (newQuantity <= 0) {
+      // DELETE (TRASH ICON): Remove from cart completely
+      console.log(`🗑️ [PRODUCT] Removing ${packagingId} from cart (trash icon clicked)`);
+      updateItemQuantity(packagingId, 0, stockQty, name, price);
     } else {
-      // If quantity is 1, remove from cart
-      setIsInCart(false);
-      setQuantity(1);
+      updateItemQuantity(packagingId, newQuantity, stockQty, name, price);
     }
   };
 
@@ -106,7 +145,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     if (badge === 'combo') {
       return (
         <View style={styles.comboBadge}>
-          <Ionicons name="gift" size={12} color="#FF9800" />
+          <Ionicons name="gift-outline" size={12} color="#FF9800" />
           <Text style={styles.comboBadgeText}>Combo</Text>
         </View>
       );
@@ -114,7 +153,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
     if (badge === 'lowest-price' || badgeText) {
       return (
         <View style={styles.lowestPriceBadge}>
-          <Ionicons name="trending-down" size={12} color="#FF0000" />
+          <Ionicons name="trending-down-outline" size={12} color="#FF0000" />
           <Text style={styles.lowestPriceText}>
             {badgeText || 'Lowest price in 7 days'}
           </Text>
@@ -134,24 +173,79 @@ const ProductCard: React.FC<ProductCardProps> = ({
       );
     }
 
-    if (!isInCart) {
+    // Show error state with retry option
+    if (hasItemError && !isItemInCart) {
       return (
-        <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-          <Ionicons name="bag" size={16} color="white" />
+        <TouchableOpacity
+          style={[styles.addToCartButton, styles.errorButton]}
+          onPress={handleAddToCart}
+        >
+          <Ionicons name="refresh-outline" size={16} color="white" />
         </TouchableOpacity>
       );
     }
 
-    return (
-      <View style={styles.quantityControl}>
-        <TouchableOpacity style={styles.quantityButton} onPress={decrementQuantity}>
-          <Ionicons name={quantity === 1 ? "trash" : "remove"} size={16} color="white" />
+    if (!isItemInCart) {
+      return (
+        <TouchableOpacity
+          style={styles.addToCartButton}
+          onPress={handleAddToCart}
+          disabled={isItemLoading}
+        >
+          <Ionicons name="bag-outline" size={16} color="white" />
         </TouchableOpacity>
+      );
+    }
+
+    // QUANTITY CONTROLS: Show trash icon when quantity = 1
+    const showTrashIcon = currentQuantity === 1;
+    const isAtStockLimit = currentQuantity >= stockQty;
+
+    return (
+      <View style={[styles.quantityControl, isItemPending && styles.quantityControlPending]}>
+        {/* DELETE (TRASH ICON) - Show trash when quantity = 1 */}
+        {/* Controls are NOT disabled during debounce (isItemPending), only during API call (isItemLoading) */}
+        <TouchableOpacity
+          style={styles.quantityButton}
+          onPress={decrementQuantity}
+          disabled={isItemLoading}
+        >
+          <Ionicons
+            name={showTrashIcon ? "trash-outline" : "remove-outline"}
+            size={16}
+            color="white"
+          />
+        </TouchableOpacity>
+
+        {/* QUANTITY DISPLAY - Show spinner during loading, subtle indicator if pending */}
         <View style={styles.quantityDisplay}>
-          <Text style={styles.quantityText}>{quantity}</Text>
+          {isItemLoading ? (
+            <ActivityIndicator size="small" color="#FF0000" />
+          ) : (
+            <>
+              <Text style={styles.quantityText}>{currentQuantity.toString()}</Text>
+              {isItemPending && (
+                <View style={styles.pendingIndicator} />
+              )}
+            </>
+          )}
         </View>
-        <TouchableOpacity style={styles.quantityButton} onPress={incrementQuantity}>
-          <Ionicons name="add" size={16} color="white" />
+
+        {/* INCREMENT BUTTON - Disabled when at stock limit OR during API call */}
+        {/* NOT disabled during debounce period (isItemPending) */}
+        <TouchableOpacity
+          style={[
+            styles.quantityButton,
+            isAtStockLimit && styles.disabledButton
+          ]}
+          onPress={incrementQuantity}
+          disabled={isItemLoading || isAtStockLimit}
+        >
+          <Ionicons
+            name="add-outline"
+            size={16}
+            color={isAtStockLimit ? "#999" : "white"}
+          />
         </TouchableOpacity>
       </View>
     );
@@ -189,10 +283,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
           {/* Image */}
           <View style={styles.listImageContainer}>
-            <Image source={{ uri: image }} style={styles.listImage} resizeMode="contain" />
-            {discount && (
+            {image && image.trim() !== '' ? (
+              <Image source={{ uri: image }} style={styles.listImage} resizeMode="contain" />
+            ) : (
+              <View style={[styles.listImage, styles.placeholderImage]}>
+                <Ionicons name="image-outline" size={24} color="#ccc" />
+              </View>
+            )}
+            {discount && discount > 0 && (
               <View style={styles.discountTag}>
-                <Text style={styles.discountText}>{discount}% off</Text>
+                <Text style={styles.discountText}>{discount.toString()}% off</Text>
               </View>
             )}
             {onNotify && (
@@ -205,21 +305,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {/* Product Info */}
           <View style={styles.listInfo}>
             <Text style={styles.listProductName} numberOfLines={2}>
-              {name}
+              {name || 'Unknown Product'}
             </Text>
             {weight && <Text style={styles.productWeight}>{weight}</Text>}
 
             {/* Price */}
             <View style={styles.priceRow}>
-              <Text style={styles.currentPrice}>LE {price.toFixed(2)}</Text>
+              <Text style={styles.currentPrice}>LE {(price || 0).toFixed(2)}</Text>
               {originalPrice && (
                 <Text style={styles.originalPrice}>
-                  LE{originalPrice.toFixed(2)}
+                  LE{(originalPrice || 0).toFixed(2)}
                 </Text>
               )}
-              {discount && (
+              {discount && discount > 0 && (
                 <View style={styles.discountBadge}>
-                  <Text style={styles.discountBadgeText}>{discount}%</Text>
+                  <Text style={styles.discountBadgeText}>{discount.toString()}%</Text>
                 </View>
               )}
             </View>
@@ -228,15 +328,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {schedule && (
               <View style={styles.scheduleContainer}>
                 <Ionicons name="calendar-outline" size={14} color="#666" />
-                <Text style={styles.scheduleText}>schedule {schedule}</Text>
+                <Text style={styles.scheduleText}>schedule {schedule?.toString() || ''}</Text>
               </View>
             )}
 
             {/* Sold Count */}
             {soldCount && (
               <View style={styles.soldContainer}>
-                <Ionicons name="fire" size={14} color="#FF6B00" />
-                <Text style={styles.soldText}>{soldCount}+ Sold recent</Text>
+                <Ionicons name="flame" size={14} color="#FF6B00" />
+                <Text style={styles.soldText}>{soldCount.toString()}+ Sold recent</Text>
               </View>
             )}
           </View>
@@ -261,7 +361,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           )}
           {badge === 'combo' && (
             <View style={styles.gridComboBadge}>
-              <Ionicons name="gift" size={10} color="#FF9800" />
+              <Ionicons name="gift-outline" size={10} color="#FF9800" />
               <Text style={styles.gridComboBadgeText}>Combo</Text>
             </View>
           )}
@@ -270,10 +370,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Image Container */}
       <View style={styles.imageContainer}>
-        <Image source={{ uri: image }} style={styles.productImage} resizeMode="contain" />
-        {discount && (
+        {typeof image === 'string' && image.trim() !== '' ? (
+          <Image source={{ uri: image }} style={styles.productImage} resizeMode="contain" />
+        ) : (
+          <View style={[styles.productImage, styles.placeholderImage]}>
+            <Ionicons name="image-outline" size={32} color="#ccc" />
+          </View>
+        )}
+        {discount! > 0 && (
           <View style={styles.discountTag}>
-            <Text style={styles.discountText}>{discount}% off</Text>
+            <Text style={styles.discountText}>{discount!.toString()}% off</Text>
           </View>
         )}
         {renderQuantityControl()}
@@ -282,22 +388,22 @@ const ProductCard: React.FC<ProductCardProps> = ({
       {/* Product Info */}
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>
-          {name}
+          {name || 'Unknown Product'}
         </Text>
         
         {/* UOM Display */}
         {uom && uomValue && (
-          <Text style={styles.uomText}>{uomValue}{uom}</Text>
+          <Text style={styles.uomText}>{uomValue.toString()}{uom}</Text>
         )}
         
         <View style={styles.priceContainer}>
-          <Text style={styles.currentPrice}>LE {price.toFixed(2)}</Text>
+          <Text style={styles.currentPrice}>LE {(price || 0).toFixed(2)}</Text>
           {originalPrice && (
-            <Text style={styles.originalPrice}>{originalPrice.toFixed(2)}</Text>
+            <Text style={styles.originalPrice}>{(originalPrice || 0).toFixed(2)}</Text>
           )}
-          {discount && (
+          {discount! > 0 && (
             <View style={styles.discountPercentBadge}>
-              <Text style={styles.discountPercentText}>{discount}%</Text>
+              <Text style={styles.discountPercentText}>{discount!.toString()}%</Text>
             </View>
           )}
         </View>
@@ -308,8 +414,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
         {/* Sold Count for out of stock */}
         {!inStock && soldCount && (
           <View style={styles.soldCountContainer}>
-            <Ionicons name="fire" size={12} color="#FF6B00" />
-            <Text style={styles.soldCountText}>{soldCount}+ Sold recent</Text>
+            <Ionicons name="flame" size={12} color="#FF6B00" />
+            <Text style={styles.soldCountText}>{soldCount.toString()}+ Sold recent</Text>
           </View>
         )}
       </View>
@@ -344,6 +450,11 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     borderRadius: 6,
+  },
+  placeholderImage: {
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   discountTag: {
     position: 'absolute',
@@ -651,21 +762,24 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 4,
   },
-  notifyButton: {
+  errorButton: {
+    backgroundColor: '#FF6B6B',
+  },
+  disabledButton: {
+    backgroundColor: '#CCCCCC',
+  },
+  quantityControlPending: {
+    opacity: 0.8,
+  },
+  pendingIndicator: {
     position: 'absolute',
-    bottom: 6,
-    right: 6,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    bottom: -2,
+    left: '50%',
+    marginLeft: -2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFA500',
   },
 });
 

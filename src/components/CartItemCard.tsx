@@ -5,16 +5,40 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { CartItem } from '../models/data';
+
+// Generic cart item interface that works with both old and new structures
+interface GenericCartItem {
+  id: string;
+  name?: string;
+  image?: string;
+  price?: number;
+  originalPrice?: number;
+  quantity: number;
+  uom?: string;
+  uomValue?: number;
+  inStock?: boolean;
+  product?: {
+    name: string;
+    image: string;
+    price: number;
+    description?: string;
+    inStock?: boolean;
+    uom?: string;
+    uomValue?: number;
+  };
+}
 
 interface CartItemCardProps {
-  item: CartItem;
+  item: GenericCartItem;
   onIncrement: (id: string) => void;
   onDecrement: (id: string) => void;
   onRemove: (id: string) => void;
   onEditOptions?: (id: string) => void;
+  isLoading?: boolean;
+  isPending?: boolean;
 }
 
 const CartItemCard: React.FC<CartItemCardProps> = ({
@@ -23,24 +47,33 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
   onDecrement,
   onRemove,
   onEditOptions,
+  isLoading = false,
+  isPending = false,
 }) => {
-  const { product, quantity, selectedOptions } = item;
-  const isOutOfStock = !product.inStock;
+  // Support both old structure (item.product) and new structure (item properties directly)
+  const name = item.name || item.product?.name || 'Unknown Product';
+  const image = item.image || item.product?.image || '';
+  const price = item.price || item.product?.price || 0;
+  const description = item.product?.description;
+  const uom = item.uom || item.product?.uom;
+  const uomValue = item.uomValue || item.product?.uomValue;
+  const quantity = item.quantity;
+  const isOutOfStock = item.inStock !== undefined ? !item.inStock : (item.product?.inStock !== undefined ? !item.product.inStock : false);
 
   return (
     <View style={[styles.container, isOutOfStock && styles.outOfStockContainer]}>
       {/* Product Image */}
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: product.image }} 
-          style={styles.productImage} 
+        <Image
+          source={{ uri: image }}
+          style={styles.productImage}
           resizeMode="cover"
         />
         {/* UOM Badge */}
-        {product.uom && product.uomValue && !isOutOfStock && (
+        {uom && uomValue && !isOutOfStock && (
           <View style={styles.uomBadge}>
             <Text style={styles.uomText}>
-              {product.uomValue} {product.uom}
+              {uomValue} {uom}
             </Text>
           </View>
         )}
@@ -58,17 +91,17 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       <View style={styles.productInfo}>
         <View style={styles.productDetails}>
           <Text style={[styles.productName, isOutOfStock && styles.greyedText]} numberOfLines={2}>
-            {product.name}
+            {name}
           </Text>
-          
-          {product.description && (
+
+          {description && (
             <Text style={[styles.supplier, isOutOfStock && styles.greyedText]} numberOfLines={1}>
-              {product.description}
+              {description}
             </Text>
           )}
-          
+
           <Text style={[styles.price, isOutOfStock && styles.greyedText]}>
-            LE {product.price.toFixed(2)}
+            LE {price.toFixed(2)}
           </Text>
         </View>
         
@@ -97,43 +130,56 @@ const CartItemCard: React.FC<CartItemCardProps> = ({
       {/* Quantity Controls or Out of Stock Actions */}
       {isOutOfStock ? (
         <View style={styles.outOfStockActionsRow}>
-          <TouchableOpacity 
-            style={styles.outOfStockTrashButton} 
+          <TouchableOpacity
+            style={styles.outOfStockTrashButton}
             onPress={() => onRemove(item.id)}
           >
             <View style={styles.trashIconContainer}>
-              <Ionicons 
-                name="trash-bin" 
-                size={18} 
-                color="#FF0000" 
+              <Ionicons
+                name="trash-bin"
+                size={18}
+                color="#FF0000"
               />
             </View>
           </TouchableOpacity>
           <Text style={styles.outOfStockQuantity}>{quantity}</Text>
         </View>
       ) : (
-        <View style={styles.quantityControls}>
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.leftButton]} 
+        <View style={[styles.quantityControls, isPending && styles.quantityControlsPending]}>
+          <TouchableOpacity
+            style={[styles.controlButton, styles.leftButton]}
             onPress={() => quantity === 1 ? onRemove(item.id) : onDecrement(item.id)}
+            disabled={isLoading}
           >
-            <Ionicons 
-              name={quantity === 1 ? "trash" : "remove"} 
-              size={20} 
-              color="#FF0000" 
+            <Ionicons
+              name={quantity === 1 ? "trash" : "remove"}
+              size={20}
+              color="#FF0000"
             />
           </TouchableOpacity>
-          
-          <Text style={styles.quantityText}>{quantity}</Text>
-          
-          <TouchableOpacity 
-            style={[styles.controlButton, styles.rightButton]} 
+
+          <View style={styles.quantityTextContainer}>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#FF0000" />
+            ) : (
+              <>
+                <Text style={styles.quantityText}>{quantity}</Text>
+                {isPending && (
+                  <View style={styles.pendingIndicator} />
+                )}
+              </>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={[styles.controlButton, styles.rightButton]}
             onPress={() => onIncrement(item.id)}
+            disabled={isLoading}
           >
-            <Ionicons 
-              name="add" 
-              size={20} 
-              color="#FF0000" 
+            <Ionicons
+              name="add"
+              size={20}
+              color="#FF0000"
             />
           </TouchableOpacity>
         </View>
@@ -271,15 +317,32 @@ const styles = StyleSheet.create({
   rightButton: {
     marginLeft: 0,
   },
+  quantityTextContainer: {
+    marginHorizontal: 12,
+    minWidth: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   quantityText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#000',
-    marginHorizontal: 12,
-    minWidth: 16,
     textAlign: 'center',
   },
-  
+  quantityControlsPending: {
+    opacity: 0.8,
+  },
+  pendingIndicator: {
+    position: 'absolute',
+    bottom: -6,
+    left: '50%',
+    marginLeft: -2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#FFA500',
+  },
+
   // Out of Stock Actions
   outOfStockActionsRow: {
     flexDirection: 'row',
