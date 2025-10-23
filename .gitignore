@@ -83,3 +83,7 @@ web-build/
 .npm
 .yarn
 .pnp.*
+
+# Firebase
+android/app/google-services.json
+ios/**/GoogleService-Info.plist

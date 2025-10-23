@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "980882564289",
+    "project_id": "miramart-app",
+    "storage_bucket": "miramart-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980882564289:android:5e983cf006eac022352040",
+        "android_client_info": {
+          "package_name": "com.modawa.mira"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjz_fnRD-LU6HPt9JDCoYHW93JmmkuBUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
+
