@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -11,12 +11,15 @@ import {
   ActivityIndicator,
   Modal,
   Animated,
-  Alert
+  Alert,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { getCatalog, CatalogResponse, Product, SubCategory } from '../services/api';
+import { useFocusEffect } from '@react-navigation/native';
+import { getCatalog, CatalogResponse, Product, SubCategory, getBag } from '../services/api';
 import ProductCard from '../components/ProductCard';
+import { useCart } from '../context/CartContext';
 
 // Mira Logo Component for placeholders
 const MiraLogo = ({ size = 40 }: { size?: number }) => (
@@ -42,7 +45,8 @@ const ProductSkeleton = () => (
 
 export default function SubCategoriesScreen({ route, navigation }: any) {
   const { categoryId, categoryName, selectedSubCategoryId: initialSubCategoryId } = route.params;
-  
+  const { syncFromBag } = useCart();
+
   // Ref for subcategories ScrollView
   const subCategoriesScrollRef = useRef<ScrollView>(null);
   
@@ -63,6 +67,7 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
   const [products, setProducts] = useState<Product[]>([]);
   const [subCategories, setSubCategories] = useState<SubCategory[]>([]);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
@@ -71,11 +76,30 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(0);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const slideAnim = useRef(new Animated.Value(0)).current;
   const indicatorAnim = useRef(new Animated.Value(0)).current;
+
+  // Sync bag data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 [SUBCATEGORIES] Screen focused, syncing bag data');
+      const syncBagData = async () => {
+        try {
+          const bagData = await getBag();
+          const allBagItems = [...bagData.expressBagItems, ...bagData.tomorrowBagItems];
+          syncFromBag(allBagItems);
+        } catch (error) {
+          console.log('⚠️ [SUBCATEGORIES] Could not sync bag data:', error);
+          // Silent fail - don't disrupt user experience
+        }
+      };
+      syncBagData();
+    }, [syncFromBag])
+  );
 
   // Load catalog data when category changes
   useEffect(() => {
@@ -322,7 +346,6 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
         badge={firstPack?.discountPercentage && firstPack.discountPercentage > 0 ? 'lowest-price' : undefined}
         badgeText={firstPack?.discountPercentage && firstPack.discountPercentage > 0 ? `${firstPack.discountPercentage.toString()}% off` : undefined}
         soldCount={0}
-        bagQuantity={firstPack?.bagQuantity}
         packagingId={firstPack?.packagingId}
         stockQty={firstPack?.stockQty || 0}
         variant="grid"

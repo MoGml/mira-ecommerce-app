@@ -16,6 +16,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import DiscountsScreen from '../screens/DiscountsScreen';
 import SavedAddressesScreen from '../screens/profile/SavedAddressesScreen';
 import AddAddressScreenWithPlaces from '../screens/location/AddAddressScreenWithPlaces';
+import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 
 // Types
 export type RootTabParamList = {
@@ -44,6 +45,10 @@ export type BagStackParamList = {
   Checkout: {
     cartItems: any[];
     shipmentType?: 'express' | 'scheduled';
+  };
+  OrderTracking: {
+    orderId: string;
+    orderDetails?: any;
   };
 };
 
@@ -107,6 +112,11 @@ function BagStackNavigator() {
       <BagStack.Screen 
         name="Checkout" 
         component={CheckoutScreen}
+        options={{ headerShown: false }}
+      />
+      <BagStack.Screen 
+        name="OrderTracking" 
+        component={OrderTrackingScreen}
         options={{ headerShown: false }}
       />
     </BagStack.Navigator>

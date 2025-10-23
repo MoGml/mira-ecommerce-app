@@ -11,6 +11,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +19,7 @@ import { useCart } from '../context/CartContext';
 import CartItemCard from '../components/CartItemCard';
 import OutOfStockBanner from '../components/OutOfStockBanner';
 import OrderAgainCarousel from '../components/OrderAgainCarousel';
+import EmptyCartDesign from '../components/EmptyCartDesign';
 import { getBag, BagItem, BagResponse } from '../services/api';
 import {
   sampleProducts,
@@ -73,7 +75,8 @@ export default function CartScreen({ navigation }: any) {
     getItemQuantity,
     isLoading: isItemLoading,
     isPending: isItemPending,
-    cartItems: contextCartItems
+    cartItems: contextCartItems,
+    syncFromBag
   } = useCart();
 
   const [bagData, setBagData] = useState<BagResponse | null>(null);
@@ -95,35 +98,87 @@ export default function CartScreen({ navigation }: any) {
       }
       setError(null);
 
-      console.log('🛒 [BAG] Fetching bag data from server...');
+      console.log('🛒 [BAG] Fetching bag data from server...', isRefresh ? '(refresh)' : '(initial)');
+      console.log('🛒 [BAG] User authentication state:', {
+        isAuthenticated,
+        isRegistered: user?.isRegistered,
+        userId: user?.id,
+        userName: user?.name
+      });
+
+      // Check if user is authenticated before making API call
+      // Only block if truly not authenticated (isAuthenticated = false)
+      // The API will handle guest vs registered users appropriately
+      if (!isAuthenticated) {
+        console.log('🛒 [BAG] User not authenticated - showing empty state');
+        setBagData({
+          customerId: 0,
+          addressId: 0,
+          bagId: 0,
+          expressBagItems: [],
+          tomorrowBagItems: [],
+          expressBagSubTotal: 0,
+          tomorrowsBagSubTotal: 0,
+          bagSubTotal: 0,
+        });
+        setError(null);
+        return;
+      }
+      
       const data = await getBag();
       console.log('✅ [BAG] Bag data received:', data);
 
       setBagData(data);
+
+      // Sync cart context with bag data from server
+      const allBagItems = [...data.expressBagItems, ...data.tomorrowBagItems];
+      syncFromBag(allBagItems);
     } catch (err: any) {
-      console.error('❌ [BAG] Error fetching bag:', err);
+      // Real errors only (empty bag is handled at API level)
+      console.error('❌ [BAG] Error fetching bag:', {
+        message: err.message,
+        status: err.status,
+        body: err.body,
+        url: err.url
+      });
       setError(err.message || 'Failed to load cart');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isAuthenticated, user, syncFromBag]);
 
-  // Fetch bag on mount and when screen is focused
+  // Fetch bag on mount
   useEffect(() => {
     fetchBag();
   }, [fetchBag]);
 
+  // Refresh bag when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 [BAG] Screen focused, refreshing bag data');
+      fetchBag();
+    }, [fetchBag])
+  );
+
   // Convert bag data to cart items with live quantities from CartContext
   const cartItems = useMemo(() => {
     if (!bagData) return [];
+
+    console.log('🔄 [BAG UI] Converting bag data to cart items');
+    console.log('🔄 [BAG UI] Express bag items:', bagData.expressBagItems.length);
+    console.log('🔄 [BAG UI] Tomorrow bag items:', bagData.tomorrowBagItems.length);
+    console.log('🔄 [BAG UI] Context cart items:', contextCartItems.size);
 
     const expressItems = bagData.expressBagItems.map(item => {
       const cartItem = convertBagItemToCartItem(item, 'express');
       // Override with live quantity from CartContext (for optimistic updates)
       const contextItem = contextCartItems.get(item.packId);
       if (contextItem) {
+        console.log(`🔄 [BAG UI] Overriding ${item.packId} qty: ${item.bagQty} -> ${contextItem.quantity}`);
         cartItem.quantity = contextItem.quantity;
+      } else {
+        console.log(`🔄 [BAG UI] No context override for ${item.packId}, using bagQty: ${item.bagQty}`);
       }
       return cartItem;
     });
@@ -133,18 +188,31 @@ export default function CartScreen({ navigation }: any) {
       // Override with live quantity from CartContext (for optimistic updates)
       const contextItem = contextCartItems.get(item.packId);
       if (contextItem) {
+        console.log(`🔄 [BAG UI] Overriding ${item.packId} qty: ${item.bagQty} -> ${contextItem.quantity}`);
         cartItem.quantity = contextItem.quantity;
+      } else {
+        console.log(`🔄 [BAG UI] No context override for ${item.packId}, using bagQty: ${item.bagQty}`);
       }
       return cartItem;
     });
 
     // Filter out items with 0 quantity (removed items)
     const allItems = [...expressItems, ...scheduledItems];
-    return allItems.filter(item => {
-      // If item exists in context with 0 quantity, it's being removed
-      const contextItem = contextCartItems.get(item.packId);
-      return !contextItem || contextItem.quantity > 0;
+    console.log('🔄 [BAG UI] Total items before filter:', allItems.length);
+    allItems.forEach(item => console.log(`  - ${item.packId}: qty=${item.quantity}, name=${item.name}`));
+
+    const filteredItems = allItems.filter(item => {
+      // Use the item's current quantity (which may be overridden from context)
+      // Filter out items with 0 quantity
+      const keep = item.quantity > 0;
+      if (!keep) {
+        console.log(`🚫 [BAG UI] Filtering out ${item.packId} (qty=${item.quantity})`);
+      }
+      return keep;
     });
+
+    console.log('✅ [BAG UI] Final cart items count:', filteredItems.length);
+    return filteredItems;
   }, [bagData, contextCartItems]);
 
   // Group cart items by shipment type
@@ -214,7 +282,17 @@ export default function CartScreen({ navigation }: any) {
 
     // Refresh bag after removing item to get updated data
     if (newQuantity === 0) {
-      setTimeout(() => fetchBag(), 500);
+      // Removals are instant (no debounce), just wait for API call
+      setTimeout(() => {
+        console.log('🔄 [BAG] Auto-refreshing after item removal');
+        // Check if item is still loading/pending
+        if (isItemLoading(item.packId) || isItemPending(item.packId)) {
+          console.log('⏳ [BAG] Item still processing, waiting longer...');
+          setTimeout(() => fetchBag(), 1000);
+        } else {
+          fetchBag();
+        }
+      }, 1000);
     }
   };
 
@@ -231,21 +309,19 @@ export default function CartScreen({ navigation }: any) {
       return;
     }
 
-    Alert.alert(
-      'Remove Item',
-      'Are you sure you want to remove this item from cart?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: () => {
-            updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
-            setTimeout(() => fetchBag(), 500);
-          },
-        },
-      ]
-    );
+    // Remove immediately without confirmation
+    updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
+    // Removals are instant (no debounce), just wait for API call
+    setTimeout(() => {
+      console.log('🔄 [BAG] Auto-refreshing after item removal');
+      // Check if item is still loading/pending
+      if (isItemLoading(item.packId) || isItemPending(item.packId)) {
+        console.log('⏳ [BAG] Item still processing, waiting longer...');
+        setTimeout(() => fetchBag(), 1000);
+      } else {
+        fetchBag();
+      }
+    }, 1000);
   };
 
   const handleClearCart = () => {
@@ -262,7 +338,11 @@ export default function CartScreen({ navigation }: any) {
             for (const item of cartItems) {
               updateItemQuantity(item.packId, 0, item.maxQty, item.name, item.price);
             }
-            setTimeout(() => fetchBag(), 500);
+            // Wait for debounce (2s) + API call time for all items
+            setTimeout(() => {
+              console.log('🔄 [BAG] Auto-refreshing after clearing cart');
+              fetchBag();
+            }, 3000);
           },
         },
       ]
@@ -341,8 +421,11 @@ export default function CartScreen({ navigation }: any) {
                 navigation.navigate('Checkout', { cartItems: checkoutItems, shipmentType, bagData });
               }
 
-              // Refresh bag data
-              setTimeout(() => fetchBag(), 500);
+              // Refresh bag data after removal
+              setTimeout(() => {
+                console.log('🔄 [BAG] Auto-refreshing after removing out-of-stock items');
+                fetchBag();
+              }, 2500);
             },
           },
         ]
@@ -580,6 +663,12 @@ export default function CartScreen({ navigation }: any) {
 
   // Empty cart state
   if (cartItems.length === 0) {
+    console.log('🛒 [BAG UI] Showing empty state - cartItems.length:', cartItems.length);
+    console.log('🛒 [BAG UI] bagData:', {
+      expressCount: bagData?.expressBagItems?.length || 0,
+      tomorrowCount: bagData?.tomorrowBagItems?.length || 0,
+      contextItemsCount: contextCartItems.size
+    });
     return (
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <View style={styles.emptyContainer}>
@@ -608,7 +697,34 @@ export default function CartScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
+        {/* Empty Cart State */}
+        {!loading && !error && bagData && totalItemCount === 0 && (
+          <EmptyCartDesign />
+        )}
+
+        {/* Loading State */}
+        {loading && !bagData && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#FF0000" />
+            <Text style={styles.loadingText}>Loading your bag...</Text>
+          </View>
+        )}
+
+        {/* Error State */}
+        {error && !bagData && (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={48} color="#FF6B6B" />
+            <Text style={styles.errorTitle}>Oops! Something went wrong</Text>
+            <Text style={styles.errorMessage}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={() => fetchBag()}>
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Cart Content */}
+        {!loading && !error && bagData && totalItemCount > 0 && (
+          <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -659,6 +775,7 @@ export default function CartScreen({ navigation }: any) {
             onAddToCart={(product) => console.log('Add to cart:', product.id)}
           />
         </ScrollView>
+        )}
 
         {/* Footer */}
         <View style={styles.footer}>
@@ -718,6 +835,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#FF0000',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingVertical: 60,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 24,
+  },
+  retryButton: {
+    backgroundColor: '#FF0000',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
@@ -1051,50 +1211,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   collapsedCheckoutButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: 'white',
-  },
-  // Loading state styles
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  // Error state styles
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-    backgroundColor: '#FFFFFF',
-  },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  errorMessage: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#FF0000',
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    borderRadius: 8,
-  },
-  retryButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: 'white',

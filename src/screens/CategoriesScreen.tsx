@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,13 @@ import {
   Image,
   TextInput,
   ActivityIndicator,
-  Alert
+  Alert,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { getCategories, Category } from '../services/api';
+import { getCategories, Category, getBag } from '../services/api';
+import { useCart } from '../context/CartContext';
 
 // Mira Logo Component for placeholders
 const MiraLogo = ({ size = 40 }: { size?: number }) => (
@@ -35,30 +38,57 @@ const CategorySkeleton = () => (
 );
 
 export default function CategoriesScreen({ navigation }: any) {
+  const { syncFromBag } = useCart();
   const [isLoading, setIsLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false);
 
+  // Sync bag data when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('🔄 [CATEGORIES] Screen focused, syncing bag data');
+      const syncBagData = async () => {
+        try {
+          const bagData = await getBag();
+          const allBagItems = [...bagData.expressBagItems, ...bagData.tomorrowBagItems];
+          syncFromBag(allBagItems);
+        } catch (error) {
+          console.log('⚠️ [CATEGORIES] Could not sync bag data:', error);
+          // Silent fail - don't disrupt user experience
+        }
+      };
+      syncBagData();
+    }, [syncFromBag])
+  );
+
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [loadCategories]);
 
-  const loadCategories = async () => {
+  // Note: Removed useFocusEffect auto-refresh to prevent API spam
+  // Users can manually refresh via pull-to-refresh
+
+  const loadCategories = useCallback(async (isRefresh = false) => {
     // Prevent multiple simultaneous requests (but allow initial load)
-    if (isLoading && !isRetrying && hasLoaded) {
+    if (isLoading && !isRetrying && hasLoaded && !isRefresh) {
       console.log('🚫 [CATEGORIES] Request already in progress, skipping duplicate request');
       return;
     }
 
     try {
-      setIsLoading(true);
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
+        setIsLoading(true);
+      }
       setError(null);
       setIsRetrying(false);
       
-      console.log('🌐 [CATEGORIES] Loading categories');
+      console.log('🌐 [CATEGORIES] Loading categories', isRefresh ? '(refresh)' : '(initial)');
       const data = await getCategories();
       console.log('✅ [CATEGORIES] API response received:', data);
       setCategories(Array.isArray(data) ? data : []);
@@ -82,8 +112,9 @@ export default function CategoriesScreen({ navigation }: any) {
       }
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, [isLoading, isRetrying, hasLoaded]);
 
   // Handle retry logic
   const handleRetry = async () => {
@@ -200,7 +231,18 @@ export default function CategoriesScreen({ navigation }: any) {
       </View>
 
       {/* Category Groups */}
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadCategories(true)}
+            tintColor="#FF0000"
+            colors={['#FF0000']}
+          />
+        }
+      >
         {isLoading && !hasLoaded ? (
           // Show loading skeleton for initial load
           Array.from({ length: 3 }).map((_, index) => (

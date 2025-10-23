@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import AddressCard from '../components/AddressCard';
 import PaymentMethodCard from '../components/PaymentMethodCard';
 import PromoCodeInput from '../components/PromoCodeInput';
-import { getCheckoutDetails, CheckoutDetailsResponse } from '../services/api';
+import { getCheckoutDetails, CheckoutDetailsResponse, placeOrder, PlaceOrderRequest } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import {
   sampleAddresses,
   samplePaymentMethods,
@@ -27,16 +28,18 @@ import {
 
 export default function CheckoutScreen({ route, navigation }: any) {
   const { cartItems = [] } = route.params || {};
+  const { user } = useAuth();
 
   // Server checkout data
   const [checkoutData, setCheckoutData] = useState<CheckoutDetailsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   const [selectedAddress, setSelectedAddress] = useState(sampleAddresses[0]);
-  const [receiverName, setReceiverName] = useState(sampleUser.name);
-  const [receiverPhone, setReceiverPhone] = useState(sampleUser.phone || '');
+  const [receiverName, setReceiverName] = useState(user?.name || sampleUser.name);
+  const [receiverPhone, setReceiverPhone] = useState(user?.phone || sampleUser.phone || '');
   const [selectedPayment, setSelectedPayment] = useState(samplePaymentMethods[0]);
   const [useWallet, setUseWallet] = useState(false);
   const [promoCode, setPromoCode] = useState<string | undefined>();
@@ -153,8 +156,13 @@ export default function CheckoutScreen({ route, navigation }: any) {
   };
 
   const handleSelectTip = (amount: number) => {
-    setDeliveryTip(amount);
-    setCustomTip('');
+    // If the same tip is selected, remove it
+    if (deliveryTip === amount) {
+      setDeliveryTip(0);
+    } else {
+      setDeliveryTip(amount);
+      setCustomTip('');
+    }
   };
 
   const handleCustomTip = (value: string) => {
@@ -163,17 +171,47 @@ export default function CheckoutScreen({ route, navigation }: any) {
     setDeliveryTip(isNaN(amount) ? 0 : amount);
   };
 
-  const handlePlaceOrder = () => {
-    Alert.alert(
-      'Order Placed!',
-      `Your order of EGP ${total.toFixed(2)} has been placed successfully.`,
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('Home'),
+  const handlePlaceOrder = async () => {
+    if (!user) {
+      Alert.alert('Error', 'User not found. Please login again.');
+      return;
+    }
+
+    setPlacingOrder(true);
+    try {
+      const payload: PlaceOrderRequest = {
+        contactPerson: receiverName,
+        contactPersonPhoneNumber: receiverPhone,
+        deliveryTips: deliveryTip,
+        promoCode: promoCode || '',
+      };
+
+      console.log('🛒 [PLACE_ORDER] Placing order with payload:', payload);
+      
+      const response = await placeOrder(payload);
+      console.log('✅ [PLACE_ORDER] Order placed successfully:', response);
+
+      // Navigate to order tracking screen
+      navigation.navigate('OrderTracking', {
+        orderId: response.orderId,
+        orderDetails: {
+          total,
+          deliveryTip,
+          promoCode,
+          receiverName,
+          receiverPhone,
         },
-      ]
-    );
+      });
+    } catch (error: any) {
+      console.error('❌ [PLACE_ORDER] Error placing order:', error);
+      Alert.alert(
+        'Order Failed',
+        error.message || 'Failed to place order. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setPlacingOrder(false);
+    }
   };
 
   const renderShipmentCard = (group: any, index: number) => {
@@ -429,8 +467,16 @@ export default function CheckoutScreen({ route, navigation }: any) {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.placeOrderButton} onPress={handlePlaceOrder}>
-            <Text style={styles.placeOrderButtonText}>Place Order</Text>
+          <TouchableOpacity 
+            style={[styles.placeOrderButton, placingOrder && styles.placeOrderButtonDisabled]} 
+            onPress={handlePlaceOrder}
+            disabled={placingOrder}
+          >
+            {placingOrder ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.placeOrderButtonText}>Place Order</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -741,6 +787,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: 'center',
+  },
+  placeOrderButtonDisabled: {
+    backgroundColor: '#666',
   },
   placeOrderButtonText: {
     fontSize: 16,

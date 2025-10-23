@@ -31,7 +31,6 @@ interface ProductCardProps {
   uom?: string; // Unit of measure (KG, Piece, Pack, etc.)
   uomValue?: number; // Value (1, 2, 500, etc.)
   promotionalMessages?: string[]; // Array of promotional messages
-  bagQuantity?: number; // Quantity of this item in the user's bag/cart
   packagingId?: number; // Required for cart operations
   stockQty?: number; // Required for stock validation
   onPress?: () => void;
@@ -58,7 +57,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
   uom,
   uomValue,
   promotionalMessages = [],
-  bagQuantity,
   packagingId,
   stockQty = 0,
   onPress,
@@ -70,9 +68,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const [currentPromoIndex, setCurrentPromoIndex] = useState(0);
 
   // Get current quantity from cart context
-  // PRIORITY: Cart context (live updates) > bagQuantity prop (stale from API)
+  // PRIORITY: Always use cart context (live updates) over bagQuantity prop (stale from API)
+  // Cart context is synced with server on focus, so it's always up-to-date
   const cartQuantity = packagingId ? getItemQuantity(packagingId) : 0;
-  const currentQuantity = cartQuantity > 0 ? cartQuantity : (bagQuantity || 0);
+  const currentQuantity = cartQuantity;
   const isItemInCart = currentQuantity > 0;
 
   // Check if this item is currently loading, pending, or has an error

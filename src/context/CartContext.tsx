@@ -17,6 +17,7 @@ interface CartContextType {
   // Actions
   updateItemQuantity: (packagingId: number, quantity: number, stockQty: number, name: string, price: number) => void;
   getItemQuantity: (packagingId: number) => number;
+  syncFromBag: (bagItems: Array<{ packId: number; bagQty: number; maxQty: number; packName: string; priceAfterDiscount: number }>) => void;
 
   // Loading states
   isLoading: (packagingId: number) => boolean;
@@ -110,9 +111,12 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
     // Mark item as pending (in debounce period)
     setPendingItems(prev => new Set(prev).add(packagingId));
-    console.log(`⏳ [CART] Item ${packagingId} is now pending (debouncing for 2s)`);
 
-    // Set up new debounce timer (per-product, 2 seconds)
+    // INSTANT REMOVAL: If quantity is 0 (removal), don't debounce - execute immediately
+    const debounceDelay = quantity === 0 ? 0 : 2000;
+    console.log(`⏳ [CART] Item ${packagingId} is now pending (debouncing for ${debounceDelay}ms)`);
+
+    // Set up new debounce timer (per-product, 2 seconds for updates, instant for removals)
     const timer = setTimeout(async () => {
       console.log(`🚀 [CART] Debounce complete for ${packagingId}, starting API call with quantity ${quantity}`);
 
@@ -123,13 +127,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
         return newSet;
       });
 
-      // DELETE (TRASH ICON) RULE: If item was not in cart (confirmed quantity = 0), do nothing
+      // ALWAYS SEND API CALL FOR REMOVALS: Even if confirmed quantity is 0,
+      // we need to inform the server to ensure cart state is synchronized
       const confirmedQuantity = confirmedQuantities.current.get(packagingId) || 0;
-      if (quantity === 0 && confirmedQuantity === 0) {
-        console.log(`⏭️ [CART] Skipping API call - item ${packagingId} was not in cart (trash icon on non-cart item)`);
-        debounceTimers.current.delete(packagingId);
-        return;
-      }
+      console.log(`📤 [CART] Preparing API call for ${packagingId}: confirmed=${confirmedQuantity}, new=${quantity}`);
 
       // LOCKING DURING REQUEST: Set loading state for this specific product
       // This locks controls while the actual API request is in progress
@@ -210,10 +211,10 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
 
       // Clear the timer reference
       debounceTimers.current.delete(packagingId);
-    }, 2000); // 2 second debounce per product
+    }, debounceDelay); // 2 second debounce for updates, instant for removals
 
     debounceTimers.current.set(packagingId, timer);
-    console.log(`⏰ [CART] Set 2-second timer for ${packagingId}`);
+    console.log(`⏰ [CART] Set ${debounceDelay}ms timer for ${packagingId}`);
   }, [cartItems]);
 
   const getItemQuantity = useCallback((packagingId: number): number => {
@@ -240,10 +241,42 @@ export const CartProvider: React.FC<CartProviderProps> = ({ children }) => {
     });
   }, []);
 
+  const syncFromBag = useCallback((bagItems: Array<{ packId: number; bagQty: number; maxQty: number; packName: string; priceAfterDiscount: number }>) => {
+    console.log('🔄 [CART] Syncing cart from bag data:', bagItems.length, 'items');
+    console.log('🔄 [CART] Bag items:', bagItems.map(i => `${i.packId}:${i.bagQty}`).join(', '));
+
+    const newCartItems = new Map<number, CartItem>();
+    const newConfirmedQuantities = new Map<number, number>();
+
+    bagItems.forEach(item => {
+      console.log(`🔍 [CART] Processing item ${item.packId}: bagQty=${item.bagQty}, name=${item.packName}`);
+      if (item.bagQty > 0) {
+        newCartItems.set(item.packId, {
+          packagingId: item.packId,
+          quantity: Math.floor(item.bagQty),
+          stockQty: Math.floor(item.maxQty),
+          name: item.packName,
+          price: item.priceAfterDiscount,
+        });
+        newConfirmedQuantities.set(item.packId, Math.floor(item.bagQty));
+        console.log(`✅ [CART] Added item ${item.packId} to cart with qty ${Math.floor(item.bagQty)}`);
+      } else {
+        console.log(`⏭️ [CART] Skipped item ${item.packId} (bagQty=${item.bagQty})`);
+      }
+    });
+
+    setCartItems(newCartItems);
+    confirmedQuantities.current = newConfirmedQuantities;
+
+    console.log('✅ [CART] Cart synced:', newCartItems.size, 'items in cart');
+    console.log('✅ [CART] Cart items:', Array.from(newCartItems.keys()).join(', '));
+  }, []);
+
   const value: CartContextType = {
     cartItems,
     updateItemQuantity,
     getItemQuantity,
+    syncFromBag,
     isLoading,
     isPending,
     hasError,

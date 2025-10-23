@@ -46,7 +46,12 @@ async function buildHeaders(extra?: HeadersInit) {
   headers['X-Device-Id'] = deviceId;
 
   const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    console.log('🔐 [API] Using auth token:', token.substring(0, 30) + '...' + token.substring(token.length - 10));
+  } else {
+    console.log('⚠️ [API] No auth token found in AsyncStorage');
+  }
 
   return { ...(extra as any), ...headers } as HeadersInit;
 }
@@ -99,13 +104,21 @@ export async function apiFetch(path: string, options?: { method?: HttpMethod; bo
     init.body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
   }
 
+  // Dynamic endpoints that should never be cached (user-specific, frequently changing data)
+  const noCacheEndpoints = ['Bags', 'Catalog', 'Orders'];
+  const shouldCache = method === 'GET' && !noCacheEndpoints.some(endpoint => path.includes(endpoint));
+
   // Generate cache key for GET requests only (POST/PUT/DELETE should not be cached)
-  const cacheKey = method === 'GET' ? generateCacheKey(path, options) : null;
-  
+  const cacheKey = shouldCache ? generateCacheKey(path, options) : null;
+
   // Check if we have a pending request for GET requests
   if (cacheKey && requestCache.has(cacheKey)) {
     console.log('🔄 [API_CACHE] Using cached request for:', cacheKey);
     return requestCache.get(cacheKey);
+  }
+
+  if (!shouldCache && method === 'GET') {
+    console.log('⚡ [API_CACHE] Skipping cache for dynamic endpoint:', path);
   }
 
   // Log request details
@@ -362,11 +375,51 @@ export type BagResponse = {
 
 export async function getBag(): Promise<BagResponse> {
   try {
-    return await apiFetch('Bags', {
+    console.log('🛒 [GET_BAG] Making API call to Bags endpoint');
+    const result = await apiFetch('Bags', {
       method: 'GET',
     });
+    console.log('🛒 [GET_BAG] API call successful:', result);
+
+    // Check if the response is the "Bag is empty" message instead of actual bag data
+    if (result && typeof result === 'object' && 'message' in result && result.message === 'Bag is empty') {
+      console.log('🛒 [GET_BAG] Bag is empty - returning empty bag structure');
+      return {
+        customerId: 0,
+        addressId: 0,
+        bagId: 0,
+        expressBagItems: [],
+        tomorrowBagItems: [],
+        expressBagSubTotal: 0,
+        tomorrowsBagSubTotal: 0,
+        bagSubTotal: 0,
+      };
+    }
+
+    return result;
   } catch (e: any) {
-    // Re-throw with additional context
+    // Handle "Bag is empty" errors
+    if (e.message === 'Bag is empty' || e.body?.message === 'Bag is empty') {
+      console.log('🛒 [GET_BAG] Bag is empty (from error) - returning empty bag structure');
+      return {
+        customerId: 0,
+        addressId: 0,
+        bagId: 0,
+        expressBagItems: [],
+        tomorrowBagItems: [],
+        expressBagSubTotal: 0,
+        tomorrowsBagSubTotal: 0,
+        bagSubTotal: 0,
+      };
+    }
+
+    console.error('🛒 [GET_BAG] API call failed:', {
+      message: e.message,
+      status: e.status,
+      body: e.body,
+      url: e.url
+    });
+    // Re-throw with additional context for real errors
     const error: any = new Error(e.message || 'Failed to fetch bag');
     error.status = e.status;
     error.body = e.body;
@@ -387,10 +440,13 @@ export type MutateBagResponse = {
 
 export async function mutateBag(payload: MutateBagRequest): Promise<MutateBagResponse> {
   try {
-    return await apiFetch('Bags/MutateBag', {
+    const response = await apiFetch('Bags/MutateBag', {
       method: 'POST',
       body: payload,
     });
+
+    // No cache clearing needed - Bags endpoint is never cached
+    return response;
   } catch (e: any) {
     // Re-throw with additional context
     const error: any = new Error(e.message || 'Failed to update bag');
@@ -548,6 +604,35 @@ export async function createAddress(payload: CreateAddressRequest): Promise<Crea
     }
     // Re-throw with additional context
     const error: any = new Error(e.message || 'Failed to create address');
+    error.status = e.status;
+    error.body = e.body;
+    throw error;
+  }
+}
+
+// Place Order types
+export type PlaceOrderRequest = {
+  contactPerson: string;
+  contactPersonPhoneNumber: string;
+  deliveryTips: number;
+  promoCode: string;
+};
+
+export type PlaceOrderResponse = {
+  orderId: string;
+  status: string;
+  message: string;
+};
+
+export async function placeOrder(payload: PlaceOrderRequest): Promise<PlaceOrderResponse> {
+  try {
+    return await apiFetch('PlaceOrders/place', {
+      method: 'POST',
+      body: payload,
+    });
+  } catch (e: any) {
+    // Re-throw with additional context
+    const error: any = new Error(e.message || 'Failed to place order');
     error.status = e.status;
     error.body = e.body;
     throw error;
