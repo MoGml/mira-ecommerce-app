@@ -146,10 +146,17 @@ export async function apiFetch(path: string, options?: { method?: HttpMethod; bo
         try {
           json = text ? JSON.parse(text) : undefined;
         } catch (parseError) {
-          console.warn('⚠️ [API_RESPONSE] Failed to parse JSON response:', parseError);
+          // Silently handle parse errors - some endpoints return plain text
+          // Only log for non-GetArea endpoints to avoid spam
+          if (!path.includes('GetArea')) {
+            console.warn('⚠️ [API_RESPONSE] Failed to parse JSON response:', parseError);
+          }
         }
 
-        // Log response details
+        // Check if this is a GetArea endpoint for special handling
+        const isGetArea = path.includes('GetArea');
+
+        // Log response details (suppress logs for GetArea errors)
         const responseLog = {
           timestamp: new Date().toISOString(),
           method,
@@ -162,12 +169,15 @@ export async function apiFetch(path: string, options?: { method?: HttpMethod; bo
           attempt: attempt + 1,
           totalAttempts: retries + 1
         };
-        
+
         if (res.ok) {
           console.log('✅ [API_RESPONSE]', JSON.stringify(responseLog, null, 2));
           return json;
         } else {
-          console.error('❌ [API_RESPONSE]', JSON.stringify(responseLog, null, 2));
+          // Don't log errors for GetArea (expected when area not covered)
+          if (!isGetArea) {
+            console.error('❌ [API_RESPONSE]', JSON.stringify(responseLog, null, 2));
+          }
           
           const message = (json && (json.message || json.error)) || `HTTP ${res.status}`;
           const error: any = new Error(message);
@@ -231,6 +241,38 @@ export type CreateGuestAddressResponse = {
   tag: string;
   description: string;
 };
+
+export type GuestAddress = {
+  id: number;
+  addressTag: string;
+  street: string | null;
+  building: string | null;
+  floor: string | null;
+  appartmentNumber: string | null;
+  landmark: string | null;
+  latitude: number;
+  longitude: number;
+  newContact: boolean;
+  contactPerson: string | null;
+  contactPersonNumber: string | null;
+  description: string;
+  isDefault: boolean;
+};
+
+export async function getGuestAddress(): Promise<GuestAddress | null> {
+  try {
+    const response = await apiFetch('Addresses/GetGuestAddress', {
+      method: 'GET',
+    });
+    return response as GuestAddress;
+  } catch (e: any) {
+    // If no guest address found, return null
+    if (e.status === 404 || e.status === 400) {
+      return null;
+    }
+    throw e;
+  }
+}
 
 export async function createGuestAddress(payload: CreateGuestAddressRequest) {
   try {
@@ -338,12 +380,24 @@ export async function getAreaCoverage(latitude: number, longitude: number): Prom
   try {
     const query = `Addresses/GetArea?lat=${encodeURIComponent(latitude)}&lng=${encodeURIComponent(longitude)}`;
     const res = await apiFetch(query, { method: 'GET' });
-    return res as AreaCoverage;
-  } catch (e: any) {
-    if (e && e.status === 400) {
+
+    // Check if response indicates no available area
+    if (res && typeof res === 'string' && res.toLowerCase().includes('no available area')) {
       return null; // Not covered
     }
-    throw e;
+
+    // If we got a valid area object with id, nameEn, nameAr
+    if (res && typeof res === 'object' && res.id) {
+      return res as AreaCoverage;
+    }
+
+    // Otherwise, area not covered
+    return null;
+  } catch (e: any) {
+    // Silently return null for any error - area not covered
+    // Don't show error messages to user
+    console.log('[API] Area coverage check - area not covered');
+    return null;
   }
 }
 
@@ -633,6 +687,34 @@ export async function placeOrder(payload: PlaceOrderRequest): Promise<PlaceOrder
   } catch (e: any) {
     // Re-throw with additional context
     const error: any = new Error(e.message || 'Failed to place order');
+    error.status = e.status;
+    error.body = e.body;
+    throw error;
+  }
+}
+
+// Bring To My Area types
+export type BringToMyAreaRequest = {
+  latittude: string;  // Note: API expects "latittude" with double 't'
+  description: string;
+  longitude: string;
+};
+
+export type BringToMyAreaResponse = {
+  success: boolean;
+  message?: string;
+};
+
+export async function bringToMyArea(payload: BringToMyAreaRequest): Promise<BringToMyAreaResponse> {
+  try {
+    const response = await apiFetch('Addresses/BringToMyArea', {
+      method: 'POST',
+      body: payload,
+    });
+    return response || { success: true };
+  } catch (e: any) {
+    // Re-throw with additional context
+    const error: any = new Error(e.message || 'Failed to submit bring to my area request');
     error.status = e.status;
     error.body = e.body;
     throw error;

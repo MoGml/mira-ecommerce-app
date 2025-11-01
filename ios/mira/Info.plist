@@ -32,7 +32,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>17</string>
     <key>GMSApiKey</key>
     <string>YOUR_IOS_GOOGLE_MAPS_API_KEY</string>
     <key>LSMinimumSystemVersion</key>

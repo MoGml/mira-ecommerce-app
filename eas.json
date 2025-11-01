@@ -1,6 +1,7 @@
 {
   "cli": {
-    "version": ">= 5.0.0"
+    "version": ">= 5.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
@@ -8,19 +9,35 @@
       "distribution": "internal",
       "ios": {
         "simulator": true,
-        "resourceClass": "m-medium"
+        "resourceClass": "medium"
       }
     },
     "preview": {
       "distribution": "internal",
       "ios": {
         "simulator": false,
-        "resourceClass": "m-medium"
+        "resourceClass": "medium"
       }
     },
     "production": {
+      "distribution": "store",
+      "prebuildCommand": "bash eas-build-pre-install.sh",
       "ios": {
-        "resourceClass": "m-medium"
+        "resourceClass": "medium",
+        "autoIncrement": true
+      },
+      "android": {
+        "resourceClass": "medium",
+        "gradleCommand": ":app:assembleRelease",
+        "applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk",
+        "autoIncrement": true
+      }
+    },
+    "release": {
+      "extends": "production",
+      "android": {
+        "buildType": "apk",
+        "resourceClass": "medium"
       }
     }
   },

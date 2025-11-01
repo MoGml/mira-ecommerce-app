@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
 import FirebaseAuthService from '../services/FirebaseAuthService';
-import { FirebaseAuthTypes } from '../config/firebase';
+import { User } from 'firebase/auth';
 
 /**
  * Custom hook for Firebase Authentication
  * Provides auth state and user information
  */
 export const useFirebaseAuth = () => {
-  const [user, setUser] = useState<FirebaseAuthTypes.User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 

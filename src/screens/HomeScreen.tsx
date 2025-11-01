@@ -17,8 +17,18 @@ export default function HomeScreen() {
       // Check if user needs address setup
       if (needsAddressSetup || (!user.selectedAddress && !selectedAddress)) {
         // Only redirect if we're not already on the AddAddress screen
-        const currentRoute = navigation.getState()?.routes[navigation.getState()?.index || 0];
-        if (currentRoute?.name !== 'AddAddress') {
+        try {
+          const navState = navigation.getState();
+          const routes = navState?.routes || [];
+          const currentIndex = navState?.index ?? 0;
+          const currentRoute = routes[currentIndex];
+
+          if (currentRoute?.name !== 'AddAddress') {
+            navigation.navigate('AddAddress' as never);
+          }
+        } catch (error) {
+          console.error('[HOME_SCREEN] Navigation error:', error);
+          // Fallback: just navigate
           navigation.navigate('AddAddress' as never);
         }
       }
@@ -32,31 +42,40 @@ export default function HomeScreen() {
 
   // Get address display text
   const getAddressText = () => {
-    console.log('[HOME_SCREEN] User:', user?.isRegistered, 'SelectedAddress:', selectedAddress, 'UserAddress:', user?.selectedAddress);
-    
-    if (!user || !user.isRegistered) {
-      // Guest user - check AddressContext for selected address
-      if (selectedAddress) {
-        const { addressTag, description } = selectedAddress;
+    try {
+      console.log('[HOME_SCREEN] User:', user?.isRegistered, 'SelectedAddress:', selectedAddress, 'UserAddress:', user?.selectedAddress);
+
+      if (!user || !user.isRegistered) {
+        // Guest user - check AddressContext for selected address
+        if (selectedAddress) {
+          const addressTag = selectedAddress.addressTag || selectedAddress.tag;
+          const description = selectedAddress.description;
+
+          if (addressTag && description) {
+            return `${addressTag} - ${description}`;
+          }
+          return description || addressTag || 'Set location';
+        }
+        return 'Set location';
+      }
+
+      // Logged-in user - prioritize AddressContext, fallback to user object
+      const address = selectedAddress || user.selectedAddress;
+      if (address) {
+        const addressTag = address.addressTag || address.tag;
+        const description = address.description;
+
         if (addressTag && description) {
           return `${addressTag} - ${description}`;
         }
         return description || addressTag || 'Set location';
       }
+
+      return 'Add address';
+    } catch (error) {
+      console.error('[HOME_SCREEN] Error getting address text:', error);
       return 'Set location';
     }
-
-    // Logged-in user - prioritize AddressContext, fallback to user object
-    const address = selectedAddress || user.selectedAddress;
-    if (address) {
-      const { addressTag, description } = address;
-      if (addressTag && description) {
-        return `${addressTag} - ${description}`;
-      }
-      return description || addressTag || 'Set location';
-    }
-
-    return 'Add address';
   };
 
   return (

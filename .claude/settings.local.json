@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(eas build:*)",
+      "Bash(chmod:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx expo install:*)",
+      "Bash(npx expo prebuild --clean --no-install)",
+      "Bash(eas credentials:*)",
+      "Bash(eas build:list:*)",
+      "Bash(curl:*)",
+      "Bash(rm:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

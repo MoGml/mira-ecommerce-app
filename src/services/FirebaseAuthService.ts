@@ -1,4 +1,18 @@
-import { firebaseAuth, FirebaseAuthTypes } from '../config/firebase';
+import { firebaseAuth } from '../config/firebase';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  updateProfile as firebaseUpdateProfile,
+  updateEmail as firebaseUpdateEmail,
+  updatePassword as firebaseUpdatePassword,
+  deleteUser,
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  User,
+  UserCredential,
+  Auth,
+} from 'firebase/auth';
 
 /**
  * Firebase Authentication Service
@@ -8,7 +22,7 @@ class FirebaseAuthService {
   /**
    * Get current authenticated user
    */
-  getCurrentUser(): FirebaseAuthTypes.User | null {
+  getCurrentUser(): User | null {
     return firebaseAuth.currentUser;
   }
 
@@ -18,9 +32,10 @@ class FirebaseAuthService {
   async signUpWithEmail(
     email: string,
     password: string
-  ): Promise<FirebaseAuthTypes.UserCredential> {
+  ): Promise<UserCredential> {
     try {
-      const userCredential = await firebaseAuth.createUserWithEmailAndPassword(
+      const userCredential = await createUserWithEmailAndPassword(
+        firebaseAuth,
         email,
         password
       );
@@ -37,9 +52,10 @@ class FirebaseAuthService {
   async signInWithEmail(
     email: string,
     password: string
-  ): Promise<FirebaseAuthTypes.UserCredential> {
+  ): Promise<UserCredential> {
     try {
-      const userCredential = await firebaseAuth.signInWithEmailAndPassword(
+      const userCredential = await signInWithEmailAndPassword(
+        firebaseAuth,
         email,
         password
       );
@@ -52,33 +68,26 @@ class FirebaseAuthService {
 
   /**
    * Sign in with phone number
+   * Note: Phone auth requires reCAPTCHA which is not available in React Native
+   * Use your backend API for phone authentication instead
    */
-  async signInWithPhoneNumber(
-    phoneNumber: string
-  ): Promise<FirebaseAuthTypes.ConfirmationResult> {
-    try {
-      const confirmation = await firebaseAuth.signInWithPhoneNumber(phoneNumber);
-      return confirmation;
-    } catch (error: any) {
-      console.error('Phone sign in error:', error);
-      throw this.handleAuthError(error);
-    }
+  async signInWithPhoneNumber(phoneNumber: string): Promise<any> {
+    throw new Error(
+      'Phone authentication should be handled through your backend API with Firebase Admin SDK'
+    );
   }
 
   /**
    * Confirm phone number verification code
+   * Note: Use your backend API for phone authentication
    */
   async confirmPhoneVerification(
-    confirmation: FirebaseAuthTypes.ConfirmationResult,
+    confirmation: any,
     code: string
-  ): Promise<FirebaseAuthTypes.UserCredential> {
-    try {
-      const userCredential = await confirmation.confirm(code);
-      return userCredential;
-    } catch (error: any) {
-      console.error('Phone verification error:', error);
-      throw this.handleAuthError(error);
-    }
+  ): Promise<UserCredential> {
+    throw new Error(
+      'Phone authentication should be handled through your backend API with Firebase Admin SDK'
+    );
   }
 
   /**
@@ -86,7 +95,7 @@ class FirebaseAuthService {
    */
   async signOut(): Promise<void> {
     try {
-      await firebaseAuth.signOut();
+      await firebaseSignOut(firebaseAuth);
     } catch (error: any) {
       console.error('Sign out error:', error);
       throw this.handleAuthError(error);
@@ -98,7 +107,7 @@ class FirebaseAuthService {
    */
   async sendPasswordResetEmail(email: string): Promise<void> {
     try {
-      await firebaseAuth.sendPasswordResetEmail(email);
+      await firebaseSendPasswordResetEmail(firebaseAuth, email);
     } catch (error: any) {
       console.error('Password reset error:', error);
       throw this.handleAuthError(error);
@@ -117,7 +126,7 @@ class FirebaseAuthService {
       if (!user) {
         throw new Error('No user is currently signed in');
       }
-      await user.updateProfile(updates);
+      await firebaseUpdateProfile(user, updates);
     } catch (error: any) {
       console.error('Update profile error:', error);
       throw this.handleAuthError(error);
@@ -133,7 +142,7 @@ class FirebaseAuthService {
       if (!user) {
         throw new Error('No user is currently signed in');
       }
-      await user.updateEmail(newEmail);
+      await firebaseUpdateEmail(user, newEmail);
     } catch (error: any) {
       console.error('Update email error:', error);
       throw this.handleAuthError(error);
@@ -149,7 +158,7 @@ class FirebaseAuthService {
       if (!user) {
         throw new Error('No user is currently signed in');
       }
-      await user.updatePassword(newPassword);
+      await firebaseUpdatePassword(user, newPassword);
     } catch (error: any) {
       console.error('Update password error:', error);
       throw this.handleAuthError(error);
@@ -165,7 +174,7 @@ class FirebaseAuthService {
       if (!user) {
         throw new Error('No user is currently signed in');
       }
-      await user.delete();
+      await deleteUser(user);
     } catch (error: any) {
       console.error('Delete account error:', error);
       throw this.handleAuthError(error);
@@ -176,9 +185,9 @@ class FirebaseAuthService {
    * Subscribe to auth state changes
    */
   onAuthStateChanged(
-    callback: (user: FirebaseAuthTypes.User | null) => void
+    callback: (user: User | null) => void
   ): () => void {
-    return firebaseAuth.onAuthStateChanged(callback);
+    return firebaseOnAuthStateChanged(firebaseAuth, callback);
   }
 
   /**

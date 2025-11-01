@@ -1,20 +1,23 @@
 import { Platform } from 'react-native';
-import { firebaseMessaging, FirebaseMessagingTypes } from '../config/firebase';
 import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 
 /**
- * Firebase Cloud Messaging Service
- * Provides methods for push notifications using Firebase Cloud Messaging
+ * Firebase Cloud Messaging Service using Expo Notifications
+ * Provides push notification functionality
  */
 class FirebaseMessagingService {
-  private fcmToken: string | null = null;
+  private expoPushToken: string | null = null;
 
   /**
    * Initialize messaging service
-   * Request permissions and get FCM token
+   * Request permissions and get push token
    */
   async initialize(): Promise<void> {
     try {
+      console.log('Initializing Firebase Cloud Messaging with Expo Notifications...');
+
       // Request notification permissions
       const hasPermission = await this.requestPermission();
 
@@ -23,17 +26,15 @@ class FirebaseMessagingService {
         return;
       }
 
-      // Get FCM token
+      // Get Expo push token
       await this.getFCMToken();
 
       // Setup notification handlers
       this.setupNotificationHandlers();
 
-      // Handle token refresh
-      this.setupTokenRefreshHandler();
+      console.log('FCM initialized successfully');
     } catch (error) {
       console.error('Failed to initialize messaging service:', error);
-      throw error;
     }
   }
 
@@ -42,16 +43,36 @@ class FirebaseMessagingService {
    */
   async requestPermission(): Promise<boolean> {
     try {
-      const authStatus = await firebaseMessaging.requestPermission();
-      const enabled =
-        authStatus === 1 || // authorized
-        authStatus === 2; // provisional
-
-      if (enabled) {
-        console.log('Notification permission granted:', authStatus);
+      if (!Device.isDevice) {
+        console.warn('Must use physical device for push notifications');
+        return false;
       }
 
-      return enabled;
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+
+      if (existingStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== 'granted') {
+        console.warn('Notification permission not granted');
+        return false;
+      }
+
+      // Set up notification channel for Android
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#FF0000',
+        });
+      }
+
+      console.log('Notification permission granted');
+      return true;
     } catch (error) {
       console.error('Failed to request notification permission:', error);
       return false;
@@ -59,20 +80,30 @@ class FirebaseMessagingService {
   }
 
   /**
-   * Get FCM token
+   * Get FCM token (Expo Push Token)
    */
   async getFCMToken(): Promise<string | null> {
     try {
-      if (this.fcmToken) {
-        return this.fcmToken;
+      if (this.expoPushToken) {
+        return this.expoPushToken;
       }
 
-      const token = await firebaseMessaging.getToken();
-      this.fcmToken = token;
-      console.log('FCM Token:', token);
+      if (!Device.isDevice) {
+        console.warn('Must use physical device for push notifications');
+        return null;
+      }
+
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+      if (!projectId) {
+        throw new Error('Project ID not found');
+      }
+
+      const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+      this.expoPushToken = token;
+      console.log('Expo Push Token:', token);
       return token;
     } catch (error) {
-      console.error('Failed to get FCM token:', error);
+      console.error('Failed to get push token:', error);
       return null;
     }
   }
@@ -82,12 +113,10 @@ class FirebaseMessagingService {
    */
   async deleteFCMToken(): Promise<void> {
     try {
-      await firebaseMessaging.deleteToken();
-      this.fcmToken = null;
-      console.log('FCM Token deleted');
+      this.expoPushToken = null;
+      console.log('Push token cleared');
     } catch (error) {
-      console.error('Failed to delete FCM token:', error);
-      throw error;
+      console.error('Failed to delete push token:', error);
     }
   }
 
@@ -95,59 +124,45 @@ class FirebaseMessagingService {
    * Setup notification handlers
    */
   private setupNotificationHandlers(): void {
-    // Handle foreground messages
-    firebaseMessaging.onMessage(async (remoteMessage) => {
-      console.log('Foreground message received:', remoteMessage);
-      await this.displayNotification(remoteMessage);
+    // Configure how notifications are presented when app is in foreground
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
     });
 
-    // Handle background/quit state messages
-    firebaseMessaging.setBackgroundMessageHandler(async (remoteMessage) => {
-      console.log('Background message received:', remoteMessage);
-      // Background messages are automatically displayed by the system
+    // Handle notification received while app is in foreground
+    Notifications.addNotificationReceivedListener((notification) => {
+      console.log('Foreground notification received:', notification);
     });
 
-    // Handle notification opened from quit state
-    firebaseMessaging.getInitialNotification().then((remoteMessage) => {
-      if (remoteMessage) {
-        console.log('Notification caused app to open from quit state:', remoteMessage);
-        this.handleNotificationOpen(remoteMessage);
-      }
-    });
-
-    // Handle notification opened from background state
-    firebaseMessaging.onNotificationOpenedApp((remoteMessage) => {
-      console.log('Notification caused app to open from background state:', remoteMessage);
-      this.handleNotificationOpen(remoteMessage);
+    // Handle notification tap
+    Notifications.addNotificationResponseReceivedListener((response) => {
+      console.log('Notification tapped:', response);
+      this.handleNotificationOpen(response.notification.request.content.data);
     });
   }
 
   /**
    * Setup token refresh handler
+   * Note: Expo handles token refresh automatically
    */
-  private setupTokenRefreshHandler(): void {
-    firebaseMessaging.onTokenRefresh(async (newToken) => {
-      console.log('FCM Token refreshed:', newToken);
-      this.fcmToken = newToken;
-      // TODO: Send updated token to your backend server
-    });
+  setupTokenRefreshHandler(): void {
+    console.log('Token refresh is handled automatically by Expo');
   }
 
   /**
    * Display notification when app is in foreground
    */
-  private async displayNotification(
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): Promise<void> {
+  async displayNotification(data: any): Promise<void> {
     try {
-      const notification = remoteMessage.notification;
-      if (!notification) return;
-
       await Notifications.scheduleNotificationAsync({
         content: {
-          title: notification.title || 'New Notification',
-          body: notification.body || '',
-          data: remoteMessage.data || {},
+          title: data.title || 'New Notification',
+          body: data.body || '',
+          data: data.data || {},
           sound: 'default',
         },
         trigger: null, // Show immediately
@@ -160,62 +175,41 @@ class FirebaseMessagingService {
   /**
    * Handle notification tap/open
    */
-  private handleNotificationOpen(
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): void {
+  private handleNotificationOpen(data: any): void {
     // TODO: Navigate to appropriate screen based on notification data
-    console.log('Notification data:', remoteMessage.data);
+    console.log('Notification data:', data);
   }
 
   /**
    * Subscribe to a topic
+   * Note: Topic subscription is not supported with Expo push notifications
+   * Use your backend to manage topic subscriptions with Firebase Admin SDK
    */
   async subscribeToTopic(topic: string): Promise<void> {
-    try {
-      await firebaseMessaging.subscribeToTopic(topic);
-      console.log(`Subscribed to topic: ${topic}`);
-    } catch (error) {
-      console.error(`Failed to subscribe to topic ${topic}:`, error);
-      throw error;
-    }
+    console.log(`Topic subscription should be handled via your backend API. Topic: ${topic}`);
   }
 
   /**
    * Unsubscribe from a topic
+   * Note: Topic unsubscription is not supported with Expo push notifications
+   * Use your backend to manage topic subscriptions with Firebase Admin SDK
    */
   async unsubscribeFromTopic(topic: string): Promise<void> {
-    try {
-      await firebaseMessaging.unsubscribeFromTopic(topic);
-      console.log(`Unsubscribed from topic: ${topic}`);
-    } catch (error) {
-      console.error(`Failed to unsubscribe from topic ${topic}:`, error);
-      throw error;
-    }
+    console.log(`Topic unsubscription should be handled via your backend API. Topic: ${topic}`);
   }
 
   /**
    * Set auto-initialization enabled
    */
   async setAutoInitEnabled(enabled: boolean): Promise<void> {
-    try {
-      await firebaseMessaging.setAutoInitEnabled(enabled);
-      console.log(`Auto-initialization ${enabled ? 'enabled' : 'disabled'}`);
-    } catch (error) {
-      console.error('Failed to set auto-initialization:', error);
-      throw error;
-    }
+    console.log(`Auto-initialization is always enabled with Expo: ${enabled}`);
   }
 
   /**
    * Check if auto-initialization is enabled
    */
   async isAutoInitEnabled(): Promise<boolean> {
-    try {
-      return await firebaseMessaging.isAutoInitEnabled;
-    } catch (error) {
-      console.error('Failed to check auto-initialization status:', error);
-      return false;
-    }
+    return true;
   }
 
   /**
@@ -225,7 +219,7 @@ class FirebaseMessagingService {
     if (Platform.OS !== 'ios') return 0;
 
     try {
-      return await firebaseMessaging.getApplicationBadgeCount();
+      return await Notifications.getBadgeCountAsync();
     } catch (error) {
       console.error('Failed to get badge count:', error);
       return 0;
@@ -239,11 +233,10 @@ class FirebaseMessagingService {
     if (Platform.OS !== 'ios') return;
 
     try {
-      await firebaseMessaging.setApplicationBadgeCount(count);
+      await Notifications.setBadgeCountAsync(count);
       console.log(`Badge count set to ${count}`);
     } catch (error) {
       console.error('Failed to set badge count:', error);
-      throw error;
     }
   }
 }

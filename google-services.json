@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "980882564289",
+    "project_id": "miramart-app",
+    "storage_bucket": "miramart-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:980882564289:android:5e983cf006eac022352040",
+        "android_client_info": {
+          "package_name": "com.modawa.mira"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "980882564289-c5uklfdd4jiq2lokgrf18h72dtpncj0f.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.modawa.mira",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "980882564289-dn43p7v0l3fnoke2imb3gb7mak3lqok8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.modawa.mira",
+            "certificate_hash": "5712b8bc60512f137461a766cdeab347b990c5dd"
+          }
+        },
+        {
+          "client_id": "980882564289-7ubsmbbda3aq2e32djoejiomntsb7j6k.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjz_fnRD-LU6HPt9JDCoYHW93JmmkuBUc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "980882564289-7ubsmbbda3aq2e32djoejiomntsb7j6k.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "980882564289-ca696tlt7gk8dgpckomufq6irb96qmdu.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.modawa.mira"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

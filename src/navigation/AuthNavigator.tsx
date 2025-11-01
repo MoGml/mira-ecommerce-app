@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LANGUAGE_KEY, ONBOARDING_SEEN_KEY, AUTH_STATUS_KEY, createGuestAddress, getBaseUrl, getDefaultHeaders } from '../services/api';
+import { LANGUAGE_KEY, ONBOARDING_SEEN_KEY, AUTH_STATUS_KEY, createGuestAddress, getGuestAddress, getBaseUrl, getDefaultHeaders } from '../services/api';
 
 // Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -13,6 +13,7 @@ import OTPVerificationScreen from '../screens/auth/OTPVerificationScreen';
 import CompleteProfileScreen from '../screens/auth/CompleteProfileScreen';
 import LocationAccessScreen from '../screens/location/LocationAccessScreen';
 import AddAddressScreen from '../screens/location/AddAddressScreen';
+import GuestAddressScreen from '../screens/location/GuestAddressScreen';
 
 type AuthFlowStep =
   | 'splash'
@@ -36,12 +37,47 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
   const [isRegisteredUser, setIsRegisteredUser] = useState(false);
   const [userName, setUserName] = useState<string | undefined>();
   const [currentLocation, setCurrentLocation] = useState<Location.LocationObject | undefined>();
+  const [isGuestMode, setIsGuestMode] = useState(false);
 
   useEffect(() => {
     const init = async () => {
       const seen = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
       const lang = (await AsyncStorage.getItem(LANGUAGE_KEY)) || 'en';
       setSelectedLanguage(lang);
+
+      // Check if this is a guest user returning to the app
+      const authStatus = await AsyncStorage.getItem(AUTH_STATUS_KEY);
+
+      if (seen && authStatus === 'guest') {
+        // Guest mode and onboarding already seen - check for guest address
+        setIsGuestMode(true);
+        try {
+          const guestAddress = await getGuestAddress();
+          if (guestAddress) {
+            // Guest has an address - navigate to home
+            await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
+              id: guestAddress.id,
+              tag: guestAddress.addressTag,
+              description: guestAddress.description,
+              lat: guestAddress.latitude,
+              lng: guestAddress.longitude,
+            }));
+            setCurrentStep('complete');
+            onComplete();
+            return;
+          } else {
+            // Guest without address - go to add address
+            setCurrentStep('add-address');
+            return;
+          }
+        } catch (error) {
+          console.log('[AUTH_NAVIGATOR] Error checking guest address:', error);
+          // On error, go to add address screen
+          setCurrentStep('add-address');
+          return;
+        }
+      }
+
       if (seen) {
         setCurrentStep('phone-input');
       } else {
@@ -100,51 +136,34 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
   };
 
   const handleAddressConfirmed = async (address: any) => {
+    let shouldNavigate = true;
+
     try {
-      // Save guest address via API (guest flow only for now)
-      const fcmToken = (await AsyncStorage.getItem('@mira_fcm_token')) || '';
-      const payload = {
-        fcmToken,
-        description: address.address,
-        addressTag: 'Home',
-        Latitude: address.latitude,
-        Longitude: address.longitude,
-      };
-      console.log('[GUEST_ADDRESS] Endpoint:', `${getBaseUrl()}Addresses/GuestAddress`);
-      console.log('[GUEST_ADDRESS] Payload:', payload);
-      console.log('[GUEST_ADDRESS] Headers:', await getDefaultHeaders());
-      const response = await createGuestAddress(payload);
-      console.log('[GUEST_ADDRESS] Response:', response);
-      await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
-        id: response?.addressId,
-        tag: response?.tag || 'Home',
-        description: response?.description || address.address,
-        lat: address.latitude,
-        lng: address.longitude,
-      }));
+      // GuestAddressScreen already handles API call and storage
+      // Just need to verify the address was saved
+      console.log('[AUTH_NAVIGATOR] Address confirmed:', address);
+
+      // Double-check storage
+      const savedAddress = await AsyncStorage.getItem('@mira_selected_address');
+      if (!savedAddress) {
+        // Fallback: save the address if not already saved
+        await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
+          id: address.id,
+          tag: address.tag || 'Home',
+          description: address.description || address.address,
+          lat: address.latitude,
+          lng: address.longitude,
+        }));
+      }
     } catch (e: any) {
-      console.log('[GUEST_ADDRESS] Error:', e);
-      
-      // Check if location is out of service
-      if (e && e.isOutOfService) {
-        // Don't navigate to home, stay on address screen to show overlay
-        console.log('[GUEST_ADDRESS] Location out of service - staying on address screen');
-        return;
-      }
-      
-      // If API fails for other reasons, still persist locally so user can continue browsing
-      await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
-        tag: 'Home',
-        description: address.address,
-        lat: address.latitude,
-        lng: address.longitude,
-      }));
-    } finally {
-      // Only navigate if not out of service
-      if (!(e && e.isOutOfService)) {
-        setCurrentStep('complete');
-        onComplete();
-      }
+      console.log('[AUTH_NAVIGATOR] Error in handleAddressConfirmed:', e);
+      shouldNavigate = false;
+    }
+
+    // Navigate to home
+    if (shouldNavigate) {
+      setCurrentStep('complete');
+      onComplete();
     }
   };
 
@@ -177,6 +196,7 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
             onNext={handlePhoneSubmitted}
             onSkip={async () => {
               await AsyncStorage.setItem(AUTH_STATUS_KEY, 'guest');
+              setIsGuestMode(true);
               setCurrentStep('location-access');
             }}
             onBack={handleOnboardingFinish}
@@ -212,13 +232,24 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
         );
 
       case 'add-address':
-        return (
-          <AddAddressScreen
-            initialLocation={currentLocation}
-            onConfirm={handleAddressConfirmed}
-            onBack={handleBackToLocationAccess}
-          />
-        );
+        // Use GuestAddressScreen for guest users, AddAddressScreen for registered users
+        if (isGuestMode) {
+          return (
+            <GuestAddressScreen
+              initialLocation={currentLocation}
+              onConfirm={handleAddressConfirmed}
+              onBack={currentLocation ? handleBackToLocationAccess : undefined}
+            />
+          );
+        } else {
+          return (
+            <AddAddressScreen
+              initialLocation={currentLocation}
+              onConfirm={handleAddressConfirmed}
+              onBack={handleBackToLocationAccess}
+            />
+          );
+        }
 
       case 'complete':
         return (

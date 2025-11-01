@@ -16,6 +16,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import DiscountsScreen from '../screens/DiscountsScreen';
 import SavedAddressesScreen from '../screens/profile/SavedAddressesScreen';
 import AddAddressScreenWithPlaces from '../screens/location/AddAddressScreenWithPlaces';
+import AddressScreenWrapper from '../screens/location/AddressScreenWrapper';
 import OrderTrackingScreen from '../screens/OrderTrackingScreen';
 
 // Types
@@ -68,14 +69,14 @@ const ProfileStack = createStackNavigator<ProfileStackParamList>();
 function HomeStackNavigator() {
   return (
     <HomeStack.Navigator>
-      <HomeStack.Screen 
-        name="HomeMain" 
+      <HomeStack.Screen
+        name="HomeMain"
         component={HomeScreen}
         options={{ headerShown: false }}
       />
-      <HomeStack.Screen 
-        name="AddAddress" 
-        component={AddAddressScreenWithPlaces}
+      <HomeStack.Screen
+        name="AddAddress"
+        component={AddressScreenWrapper}
         options={{ headerShown: false }}
       />
     </HomeStack.Navigator>
