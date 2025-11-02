@@ -9,7 +9,9 @@
       "Bash(eas credentials:*)",
       "Bash(eas build:list:*)",
       "Bash(curl:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(eas build:configure:*)",
+      "Bash(npx expo prebuild:*)"
     ],
     "deny": [],
     "ask": []

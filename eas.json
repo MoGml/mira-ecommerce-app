@@ -28,8 +28,6 @@
       },
       "android": {
         "resourceClass": "medium",
-        "gradleCommand": ":app:assembleRelease",
-        "applicationArchivePath": "android/app/build/outputs/apk/release/app-release.apk",
         "autoIncrement": true
       }
     },
