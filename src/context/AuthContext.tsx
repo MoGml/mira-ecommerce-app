@@ -77,11 +77,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userData = await AsyncStorage.getItem(STORAGE_KEY);
       const authStatus = await AsyncStorage.getItem(AUTH_STATUS_KEY);
-      
+
       if (userData) {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
-        
+
+        // Sync selected address to AddressContext storage if it exists
+        if (parsedUser.selectedAddress) {
+          await AsyncStorage.setItem('@mira_selected_address', JSON.stringify(parsedUser.selectedAddress));
+          console.log('✅ [AUTH] Synced existing user address to AddressContext on load');
+        }
+
         // Check if logged-in user needs address setup
         if (parsedUser.isRegistered && !parsedUser.selectedAddress) {
           setNeedsAddressSetup(true);
@@ -164,6 +170,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       await saveUser(loggedInUser);
 
+      // Sync selected address to AddressContext storage
+      if (response.selectedAddress) {
+        await AsyncStorage.setItem('@mira_selected_address', JSON.stringify(response.selectedAddress));
+        console.log('✅ [AUTH] Synced selected address to AddressContext');
+      }
+
       // Check if user needs address setup
       const needsAddress = !response.selectedAddress;
       if (needsAddress) {
@@ -208,8 +220,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(AUTH_STATUS_KEY);
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+      await AsyncStorage.removeItem('@mira_selected_address'); // Clear AddressContext storage
       setUser(null);
       setNeedsAddressSetup(false);
+      console.log('✅ [AUTH] Logged out and cleared all data');
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -239,6 +253,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         selectedAddress: address,
       };
       await saveUser(updatedUser);
+
+      // Sync to AddressContext storage
+      await AsyncStorage.setItem('@mira_selected_address', JSON.stringify(address));
+      console.log('✅ [AUTH] Updated and synced selected address');
+
       setNeedsAddressSetup(false); // Address setup is now complete
     } catch (error) {
       console.error('Error updating selected address:', error);

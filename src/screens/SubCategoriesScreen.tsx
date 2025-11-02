@@ -141,16 +141,34 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
       console.log('🌐 [CATALOG] Loading catalog for category:', categoryId, 'subCategory:', currentSubCategoryId, 'page:', currentPage);
       const data = await getCatalog(categoryId, currentPage, 20, currentSubCategoryId || undefined);
       console.log('✅ [CATALOG] API response received:', data);
-      
+
+      // Transform packs into products (API returns packs directly, but we need Product objects)
+      const transformedProducts: Product[] = (data.packs || data.products || []).map((pack: any, index: number) => {
+        // If it's already a Product with packs, return as-is
+        if (pack.packs && Array.isArray(pack.packs)) {
+          return pack as Product;
+        }
+
+        // Otherwise, transform Pack into Product
+        return {
+          productId: pack.packagingId || index,
+          subCategoryId: currentSubCategoryId || 0,
+          title: pack.name || '',
+          packs: [pack]
+        } as Product;
+      });
+
+      console.log('🔄 [CATALOG] Transformed products:', transformedProducts.length, 'items');
+
       if (resetPage) {
-        setProducts(data.products || []);
+        setProducts(transformedProducts);
         setPage(1);
         setRetryCount(0); // Reset retry count on successful load
         setHasLoaded(true); // Mark as loaded to enable duplicate request prevention
       } else {
-        setProducts(prev => [...prev, ...(data.products || [])]);
+        setProducts(prev => [...prev, ...transformedProducts]);
       }
-      
+
       // Only set subcategories on first load
       if (resetPage) {
         setSubCategories(data.subCategories || []);
@@ -166,8 +184,8 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
           setSelectedSubCategory('All');
         }
       }
-      
-      setHasMore(data.products && data.products.length >= 20);
+
+      setHasMore((data.packs || data.products || []).length >= 20);
     } catch (err: any) {
       console.error('❌ [CATALOG] Error loading catalog:', err);
       
