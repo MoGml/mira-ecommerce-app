@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AUTH_STATUS_KEY, AUTH_TOKEN_KEY, login as apiLogin, LoginRequest, Address } from '../services/api';
+import { AUTH_STATUS_KEY, AUTH_TOKEN_KEY, login as apiLogin, LoginRequest, Address, checkCustomerExist, customerRegister, CustomerRegisterRequest } from '../services/api';
 import { AppState } from 'react-native';
 
 export interface User {
@@ -119,18 +119,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const checkPhoneNumber = async (phone: string): Promise<{ exists: boolean; userName?: string }> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const registeredUser = REGISTERED_USERS[phone];
-    if (registeredUser) {
+    try {
+      // Egypt country code - can be made dynamic later
+      const countryCode = 20;
+      const phoneNumber = phone.startsWith('0') ? phone.substring(1) : phone;
+
+      console.log('📱 [AUTH] Checking phone number:', { phoneNumber, countryCode });
+
+      const result = await checkCustomerExist(phoneNumber, countryCode);
+
+      console.log('📱 [AUTH] Phone check result:', result);
+
       return {
-        exists: true,
-        userName: registeredUser.name,
+        exists: result.exists,
+        userName: undefined, // API doesn't return userName in CheckCustomerExist
       };
+    } catch (error: any) {
+      console.error('❌ [AUTH] Failed to check phone number:', error);
+      // Return false on error to allow flow to continue
+      return { exists: false };
     }
-    
-    return { exists: false };
   };
 
   const login = async (phone: string, otp: string): Promise<{ success: boolean; isNewUser: boolean; error?: string; needsAddressSetup?: boolean }> => {
@@ -198,21 +206,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const register = async (name: string, email: string, phone: string): Promise<{ success: boolean; error?: string }> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      // Egypt country code - can be made dynamic later
+      const countryCode = 20;
+      const phoneNumber = phone.startsWith('0') ? phone.substring(1) : phone;
 
-    const newUser: User = {
-      id: Date.now().toString(),
-      name,
-      email,
-      phone,
-      walletBalance: 0,
-      isRegistered: true,
-    };
+      console.log('📝 [AUTH] Registering new customer:', { name, email, phoneNumber, countryCode });
 
-    await saveUser(newUser);
-    
-    return { success: true };
+      const registerRequest: CustomerRegisterRequest = {
+        phoneNumber: phoneNumber,
+        countryCode: countryCode,
+        name: name,
+        email: email,
+        fcmToken: undefined, // TODO: Add FCM token from Firebase
+        idToken: undefined,
+      };
+
+      const response = await customerRegister(registerRequest);
+
+      console.log('✅ [AUTH] Registration successful:', response);
+
+      // Store auth token
+      await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
+
+      // Create user object from response
+      const newUser: User = {
+        id: response.customerId.toString(),
+        name: response.displayName,
+        email: email, // Keep the provided email
+        phone: response.phoneNumber,
+        walletBalance: response.wallet,
+        points: response.points,
+        isRegistered: true,
+        selectedAddress: response.selectedAddress,
+      };
+
+      await saveUser(newUser);
+
+      // Sync selected address to AddressContext storage
+      if (response.selectedAddress) {
+        await AsyncStorage.setItem('@mira_selected_address', JSON.stringify(response.selectedAddress));
+        console.log('✅ [AUTH] Synced selected address to AddressContext');
+      } else {
+        // New user without address - set flag to enforce address creation
+        console.log('⚠️ [AUTH] New user registered without address - will require address setup');
+        setNeedsAddressSetup(true);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ [AUTH] Registration failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Registration failed. Please try again.',
+      };
+    }
   };
 
   const logout = async () => {

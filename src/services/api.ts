@@ -652,6 +652,125 @@ export type Address = {
   isDefault?: boolean;
 };
 
+// Check Customer Exist types
+export type CheckCustomerExistResponse = {
+  exists: boolean;
+  message?: string;
+};
+
+export async function checkCustomerExist(
+  phoneNumber: string,
+  countryCode: number
+): Promise<CheckCustomerExistResponse> {
+  try {
+    console.log("📞 [CHECK_CUSTOMER] Checking if customer exists:", {
+      phoneNumber,
+      countryCode,
+      timestamp: new Date().toISOString(),
+    });
+
+    const query = `Accounts/CheckCustomerExist?phoneNumber=${encodeURIComponent(
+      phoneNumber
+    )}&countryCode=${countryCode}`;
+
+    const result = await apiFetch(query, {
+      method: "GET",
+    });
+
+    console.log("📞 [CHECK_CUSTOMER] Customer check result:", {
+      phoneNumber,
+      exists: result.exists,
+      message: result.message,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  } catch (e: any) {
+    console.error("📞 [CHECK_CUSTOMER] Failed to check customer:", {
+      phoneNumber,
+      countryCode,
+      error: e.message,
+      status: e.status,
+      body: e.body,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Re-throw with additional context
+    const error: any = new Error(e.message || "Failed to check customer");
+    error.status = e.status;
+    error.body = e.body;
+    throw error;
+  }
+}
+
+// Register types
+export type CustomerRegisterRequest = {
+  fcmToken?: string;
+  idToken?: string;
+  email?: string;
+  phoneNumber: string;
+  countryCode: number;
+  name?: string;
+};
+
+export type CustomerRegisterResponse = {
+  customerId: number;
+  wallet: number;
+  points: number;
+  phoneNumber: string;
+  displayName: string;
+  token: string;
+  selectedAddress: Address | null;
+};
+
+export async function customerRegister(
+  payload: CustomerRegisterRequest
+): Promise<CustomerRegisterResponse> {
+  try {
+    console.log("📝 [CUSTOMER_REGISTER] Registering new customer:", {
+      phoneNumber: payload.phoneNumber,
+      countryCode: payload.countryCode,
+      name: payload.name,
+      email: payload.email,
+      hasFcmToken: !!payload.fcmToken,
+      hasIdToken: !!payload.idToken,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await apiFetch("Accounts/CustomerRegister", {
+      method: "POST",
+      body: payload,
+    });
+
+    console.log("📝 [CUSTOMER_REGISTER] Registration successful:", {
+      customerId: result.customerId,
+      phoneNumber: result.phoneNumber,
+      displayName: result.displayName,
+      wallet: result.wallet,
+      points: result.points,
+      hasSelectedAddress: !!result.selectedAddress,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  } catch (e: any) {
+    console.error("📝 [CUSTOMER_REGISTER] Registration failed:", {
+      phoneNumber: payload.phoneNumber,
+      countryCode: payload.countryCode,
+      error: e.message,
+      status: e.status,
+      body: e.body,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Re-throw with additional context
+    const error: any = new Error(e.message || "Failed to register customer");
+    error.status = e.status;
+    error.body = e.body;
+    throw error;
+  }
+}
+
 export type LoginRequest = {
   fcmToken: string;
   idToken: string;

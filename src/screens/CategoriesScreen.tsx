@@ -16,6 +16,23 @@ import { Ionicons } from '@expo/vector-icons';
 import { getCategories, Category, getBag } from '../services/api';
 import { useCart } from '../context/CartContext';
 
+// Category Image Component with fallback
+const CategoryImage = ({ uri, size = 80 }: { uri: string | null; size?: number }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!uri || imageError) {
+    return <MiraLogo size={size} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={[styles.categoryImage, { width: size, height: size }]}
+      onError={() => setImageError(true)}
+    />
+  );
+};
+
 // Mira Logo Component for placeholders
 const MiraLogo = ({ size = 40 }: { size?: number }) => (
   <View style={[styles.miraLogo, { width: size, height: size }]}>
@@ -154,7 +171,7 @@ export default function CategoriesScreen({ navigation }: any) {
       style={styles.categoryCard}
       onPress={() => handleCategoryPress(category.id.toString(), category.name)}
     >
-      <MiraLogo size={60} />
+      <CategoryImage uri={category.pictureUrl} size={80} />
       <Text style={styles.categoryName}>{category.name}</Text>
     </TouchableOpacity>
   );
@@ -184,7 +201,7 @@ export default function CategoriesScreen({ navigation }: any) {
               style={styles.categoryCard}
               onPress={() => handleSubCategoryPress(category.id.toString(), category.name, subCategory.id.toString(), subCategory.name)}
             >
-              <MiraLogo size={60} />
+              <CategoryImage uri={subCategory.pictureUrl} size={80} />
               <Text style={styles.categoryName}>{subCategory.name}</Text>
             </TouchableOpacity>
           ))

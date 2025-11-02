@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   FlatList,
   TextInput,
   ActivityIndicator,
@@ -20,6 +20,24 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getCatalog, CatalogResponse, Product, SubCategory, getBag } from '../services/api';
 import ProductCard from '../components/ProductCard';
 import { useCart } from '../context/CartContext';
+
+// SubCategory Image Component with fallback
+const SubCategoryImage = ({ uri, size = 30 }: { uri: string | null; size?: number }) => {
+  const [imageError, setImageError] = useState(false);
+
+  if (!uri || imageError) {
+    return <MiraLogo size={size} />;
+  }
+
+  return (
+    <Image
+      source={{ uri }}
+      style={{ width: size, height: size, borderRadius: 6 }}
+      onError={() => setImageError(true)}
+      resizeMode="cover"
+    />
+  );
+};
 
 // Mira Logo Component for placeholders
 const MiraLogo = ({ size = 40 }: { size?: number }) => (
@@ -395,7 +413,7 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
           styles.subCategoryIcon,
           selectedSubCategory === categoryName && styles.selectedSubCategoryIcon
         ]}>
-          <MiraLogo size={30} />
+          <SubCategoryImage uri={subCategory.pictureUrl} size={30} />
         </View>
         <Text style={[
           styles.subCategoryText,

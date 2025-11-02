@@ -9,6 +9,8 @@ import Constants from 'expo-constants';
  */
 class FirebaseMessagingService {
   private expoPushToken: string | null = null;
+  private notificationReceivedSubscription: ReturnType<typeof Notifications.addNotificationReceivedListener> | null = null;
+  private notificationResponseSubscription: ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | null = null;
 
   /**
    * Initialize messaging service
@@ -124,6 +126,14 @@ class FirebaseMessagingService {
    * Setup notification handlers
    */
   private setupNotificationHandlers(): void {
+    // Remove existing listeners to prevent duplicates
+    if (this.notificationReceivedSubscription) {
+      this.notificationReceivedSubscription.remove();
+    }
+    if (this.notificationResponseSubscription) {
+      this.notificationResponseSubscription.remove();
+    }
+
     // Configure how notifications are presented when app is in foreground
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
@@ -134,15 +144,30 @@ class FirebaseMessagingService {
     });
 
     // Handle notification received while app is in foreground
-    Notifications.addNotificationReceivedListener((notification) => {
+    this.notificationReceivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       console.log('Foreground notification received:', notification);
     });
 
     // Handle notification tap
-    Notifications.addNotificationResponseReceivedListener((response) => {
+    this.notificationResponseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       console.log('Notification tapped:', response);
       this.handleNotificationOpen(response.notification.request.content.data);
     });
+  }
+
+  /**
+   * Cleanup notification listeners
+   */
+  cleanup(): void {
+    if (this.notificationReceivedSubscription) {
+      this.notificationReceivedSubscription.remove();
+      this.notificationReceivedSubscription = null;
+    }
+    if (this.notificationResponseSubscription) {
+      this.notificationResponseSubscription.remove();
+      this.notificationResponseSubscription = null;
+    }
+    console.log('Notification listeners cleaned up');
   }
 
   /**

@@ -3,6 +3,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LANGUAGE_KEY, ONBOARDING_SEEN_KEY, AUTH_STATUS_KEY, createGuestAddress, getGuestAddress, getBaseUrl, getDefaultHeaders } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 // Screens
 import SplashScreen from '../screens/auth/SplashScreen';
@@ -31,6 +32,7 @@ interface AuthNavigatorProps {
 }
 
 const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
+  const { updateSelectedAddress, markAddressSetupComplete } = useAuth();
   const [currentStep, setCurrentStep] = useState<AuthFlowStep>('splash');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -47,6 +49,18 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
 
       // Check if this is a guest user returning to the app
       const authStatus = await AsyncStorage.getItem(AUTH_STATUS_KEY);
+
+      // Check if there's a registered user without an address
+      const userData = await AsyncStorage.getItem('@mira_user');
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        if (parsedUser.isRegistered && !parsedUser.selectedAddress) {
+          // Registered user without address - direct to location access
+          console.log('[AUTH_NAVIGATOR] Registered user needs address - directing to location access');
+          setCurrentStep('location-access');
+          return;
+        }
+      }
 
       if (seen && authStatus === 'guest') {
         // Guest mode and onboarding already seen - check for guest address
@@ -123,6 +137,8 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
   };
 
   const handleProfileCompleted = () => {
+    // New registered users MUST create an address
+    console.log('[AUTH_NAVIGATOR] Profile completed - directing to location access for address creation');
     setCurrentStep('location-access');
   };
 
@@ -155,6 +171,32 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
           lng: address.longitude,
         }));
       }
+
+      // Update the user's selected address in AuthContext (for registered users)
+      if (!isGuestMode) {
+        const formattedAddress = {
+          id: address.id,
+          addressTag: address.tag || 'Home',
+          appartmentNumber: address.appartmentNumber || null,
+          floor: address.floor || null,
+          building: address.building || null,
+          street: address.street || null,
+          landmark: address.landmark || null,
+          latitude: address.latitude,
+          longitude: address.longitude,
+          newContact: address.newContact || false,
+          contactPerson: address.contactPerson || null,
+          contactPersonNumber: address.contactPersonNumber || null,
+          description: address.description || address.address,
+          isDefault: true,
+        };
+
+        await updateSelectedAddress(formattedAddress);
+        console.log('[AUTH_NAVIGATOR] Updated selected address in AuthContext for registered user');
+      }
+
+      // Mark address setup as complete
+      markAddressSetupComplete();
     } catch (e: any) {
       console.log('[AUTH_NAVIGATOR] Error in handleAddressConfirmed:', e);
       shouldNavigate = false;

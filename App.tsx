@@ -7,13 +7,19 @@ import AppNavigator from './src/navigation/AppNavigator';
 import AuthNavigator from './src/navigation/AuthNavigator';
 
 function AppContent() {
-  const { isAuthenticated, isLoading, completeGuestFlow } = useAuth();
+  const { isAuthenticated, isLoading, completeGuestFlow, needsAddressSetup, user } = useAuth();
 
   if (isLoading) {
     return null; // Or a loading screen
   }
 
   if (!isAuthenticated) {
+    return <AuthNavigator onComplete={completeGuestFlow} />;
+  }
+
+  // If registered user needs address setup, show AuthNavigator to complete the flow
+  if (needsAddressSetup && user?.isRegistered) {
+    console.log('⚠️ [APP] Registered user needs address setup - redirecting to address creation');
     return <AuthNavigator onComplete={completeGuestFlow} />;
   }
 
