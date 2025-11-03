@@ -21,7 +21,6 @@
     },
     "production": {
       "distribution": "store",
-      "prebuildCommand": "bash eas-build-pre-install.sh",
       "ios": {
         "resourceClass": "medium",
         "autoIncrement": true
