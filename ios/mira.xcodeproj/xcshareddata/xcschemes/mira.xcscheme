@@ -17,7 +17,7 @@
                BlueprintIdentifier = "13B07F861A680F5B00A75B9A"
                BuildableName = "Mira.app"
                BlueprintName = "Mira"
-               ReferencedContainer = "container:Mira.xcodeproj">
+               ReferencedContainer = "container:mira.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -35,7 +35,7 @@
                BlueprintIdentifier = "00E356ED1AD99517003FC87E"
                BuildableName = "MiraTests.xctest"
                BlueprintName = "MiraTests"
-               ReferencedContainer = "container:Mira.xcodeproj">
+               ReferencedContainer = "container:mira.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
