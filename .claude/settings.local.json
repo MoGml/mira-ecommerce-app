@@ -11,7 +11,13 @@
       "Bash(curl:*)",
       "Bash(rm:*)",
       "Bash(eas build:configure:*)",
-      "Bash(npx expo prebuild:*)"
+      "Bash(npx expo prebuild:*)",
+      "Bash(npx eas-cli:*)",
+      "Bash(mv:*)",
+      "Bash(git add:*)",
+      "Bash(git log:*)",
+      "Bash(git commit:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
