@@ -88,5 +88,6 @@ web-build/
 .pnp.*
 
 # Firebase
-android/app/google-services.json
-ios/**/GoogleService-Info.plist
+# Note: Firebase config files are now tracked for EAS Build
+# android/app/google-services.json
+# ios/**/GoogleService-Info.plist
