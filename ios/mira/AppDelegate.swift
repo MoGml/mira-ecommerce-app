@@ -1,8 +1,6 @@
 import Expo
 import React
 import ReactAppDependencyProvider
-import Firebase
-import UserNotifications
 
 // @generated begin react-native-maps-import - expo prebuild (DO NOT MODIFY) sync-bee50fec513f89284e0fa3f5d935afdde33af98f
 #if canImport(GoogleMaps)
@@ -20,12 +18,6 @@ public class AppDelegate: ExpoAppDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // Initialize Firebase
-    FirebaseApp.configure()
-
-    // Set notification delegate (don't request permissions here - let React Native handle it)
-    UNUserNotificationCenter.current().delegate = self
-
     let delegate = ReactNativeDelegate()
     let factory = ExpoReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -42,7 +34,7 @@ public class AppDelegate: ExpoAppDelegate {
       launchOptions: launchOptions)
 #endif
 
-// @generated begin react-native-maps-init - expo prebuild (DO NOT MODIFY) sync-3c0aa542efce9df30bb7e3bc00f62fac574030e1
+// @generated begin react-native-maps-init - expo prebuild (DO NOT MODIFY) sync-e9a547fcaed8a242a4fc80f942cc8e7567aae3a4
 #if canImport(GoogleMaps)
 GMSServices.provideAPIKey("AIzaSyDIKeejXOmNEeOcyQ7pAe2IDnOMaiaM5ww")
 #endif
@@ -67,55 +59,6 @@ GMSServices.provideAPIKey("AIzaSyDIKeejXOmNEeOcyQ7pAe2IDnOMaiaM5ww")
   ) -> Bool {
     let result = RCTLinkingManager.application(application, continue: userActivity, restorationHandler: restorationHandler)
     return super.application(application, continue: userActivity, restorationHandler: restorationHandler) || result
-  }
-
-  // Firebase Cloud Messaging - Register for remote notifications
-  public func application(
-    _ application: UIApplication,
-    didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
-  ) {
-    // Pass device token to Firebase
-    Messaging.messaging().apnsToken = deviceToken
-  }
-
-  // Firebase Cloud Messaging - Handle registration errors
-  public func application(
-    _ application: UIApplication,
-    didFailToRegisterForRemoteNotificationsWithError error: Error
-  ) {
-    print("Failed to register for remote notifications: \(error.localizedDescription)")
-  }
-
-  // Handle remote notifications
-  public override func application(
-    _ application: UIApplication,
-    didReceiveRemoteNotification userInfo: [AnyHashable: Any],
-    fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
-  ) {
-    // Handle the notification
-    super.application(application, didReceiveRemoteNotification: userInfo, fetchCompletionHandler: completionHandler)
-    completionHandler(.newData)
-  }
-}
-
-// MARK: - UNUserNotificationCenterDelegate
-extension AppDelegate: UNUserNotificationCenterDelegate {
-  // Handle notifications when app is in foreground
-  public func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    willPresent notification: UNNotification,
-    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
-  ) {
-    completionHandler([[.banner, .sound, .badge]])
-  }
-
-  // Handle notification tap
-  public func userNotificationCenter(
-    _ center: UNUserNotificationCenter,
-    didReceive response: UNNotificationResponse,
-    withCompletionHandler completionHandler: @escaping () -> Void
-  ) {
-    completionHandler()
   }
 }
 
