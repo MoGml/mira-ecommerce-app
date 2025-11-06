@@ -16,16 +16,9 @@ export const initializeFirebase = async (): Promise<void> => {
 
     console.log('Firebase initialized successfully');
 
-    // Configure notification behavior for foreground notifications
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      }),
-    });
-
     // Initialize Firebase Cloud Messaging
+    // Note: Notification handler is configured in FirebaseMessagingService.setupNotificationHandlers()
+    // This includes support for both regular and silent notifications
     await FirebaseMessagingService.initialize();
 
     console.log('Firebase services initialized successfully');

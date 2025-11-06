@@ -11,6 +11,7 @@ class FirebaseMessagingService {
   private expoPushToken: string | null = null;
   private notificationReceivedSubscription: ReturnType<typeof Notifications.addNotificationReceivedListener> | null = null;
   private notificationResponseSubscription: ReturnType<typeof Notifications.addNotificationResponseReceivedListener> | null = null;
+  private silentNotificationHandler: ((data: any) => void) | null = null;
 
   /**
    * Initialize messaging service
@@ -123,6 +124,15 @@ class FirebaseMessagingService {
   }
 
   /**
+   * Check if a notification should be silent
+   * Silent notifications have a 'silent' flag in their data payload
+   */
+  private isSilentNotification(notification: Notifications.Notification): boolean {
+    const data = notification.request.content.data;
+    return data?.silent === true || data?.silent === 'true';
+  }
+
+  /**
    * Setup notification handlers
    */
   private setupNotificationHandlers(): void {
@@ -136,16 +146,43 @@ class FirebaseMessagingService {
 
     // Configure how notifications are presented when app is in foreground
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: true,
-      }),
+      handleNotification: async (notification) => {
+        // Check if this is a silent notification
+        const isSilent = this.isSilentNotification(notification);
+
+        if (isSilent) {
+          // Silent notification - don't show alert or play sound
+          console.log('🔕 Silent notification received:', notification.request.content.data);
+          this.handleSilentNotification(notification.request.content.data);
+
+          return {
+            shouldShowAlert: false,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+            shouldShowBanner: false,
+            shouldShowList: false,
+          };
+        }
+
+        // Regular notification - show alert and play sound
+        return {
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: true,
+          shouldShowBanner: true,
+          shouldShowList: true,
+        };
+      },
     });
 
     // Handle notification received while app is in foreground
     this.notificationReceivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('Foreground notification received:', notification);
+      const isSilent = this.isSilentNotification(notification);
+      if (isSilent) {
+        console.log('🔕 Silent notification received in foreground');
+      } else {
+        console.log('🔔 Foreground notification received:', notification);
+      }
     });
 
     // Handle notification tap
@@ -198,11 +235,71 @@ class FirebaseMessagingService {
   }
 
   /**
+   * Handle silent notification
+   * Process background data without showing UI
+   */
+  private handleSilentNotification(data: any): void {
+    console.log('📦 Processing silent notification data:', data);
+
+    // Call the registered handler if one exists
+    if (this.silentNotificationHandler) {
+      try {
+        this.silentNotificationHandler(data);
+      } catch (error) {
+        console.error('Error in silent notification handler:', error);
+      }
+    }
+
+    // Handle different types of silent notifications
+    const notificationType = data?.type;
+    switch (notificationType) {
+      case 'data-sync':
+        console.log('🔄 Triggering data sync...');
+        // TODO: Implement data sync logic
+        break;
+      case 'order-update':
+        console.log('📦 Order status updated:', data?.orderId);
+        // TODO: Update order data in local storage/state
+        break;
+      case 'content-refresh':
+        console.log('🔄 Refreshing content...');
+        // TODO: Refresh app content
+        break;
+      default:
+        console.log('📬 Silent notification with custom data:', data);
+    }
+  }
+
+  /**
    * Handle notification tap/open
    */
   private handleNotificationOpen(data: any): void {
     // TODO: Navigate to appropriate screen based on notification data
     console.log('Notification data:', data);
+  }
+
+  /**
+   * Register a handler for silent notifications
+   * This allows you to process background data updates
+   *
+   * @param handler - Function to call when silent notification is received
+   * @example
+   * FirebaseMessagingService.setSilentNotificationHandler((data) => {
+   *   console.log('Silent notification received:', data);
+   *   // Update app state, sync data, etc.
+   * });
+   */
+  setSilentNotificationHandler(handler: (data: any) => void): void {
+    this.silentNotificationHandler = handler;
+    console.log('✅ Silent notification handler registered');
+  }
+
+  /**
+   * Remove the silent notification handler
+   */
+  removeSilentNotificationHandler(): void {
+    this.silentNotificationHandler = null;
+    console.log('❌ Silent notification handler removed');
   }
 
   /**
