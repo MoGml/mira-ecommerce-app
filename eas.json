@@ -6,7 +6,8 @@
   "build": {
     "apk": {
       "android": { "buildType": "apk" },
-      "distribution": "internal"
+      "distribution": "internal",
+      "autoIncrement": true
     },
     "development": {
       "developmentClient": true,
