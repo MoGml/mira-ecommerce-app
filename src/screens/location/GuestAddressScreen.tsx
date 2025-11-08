@@ -5,8 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import MapView, { Region, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import PlacesAutocomplete from '../../components/PlacesAutocomplete';
-import { getAreaCoverage, bringToMyArea, createGuestAddress } from '../../services/api';
+import { getAreaCoverage, bringToMyArea, createGuestAddress, createAddress } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../../context/AuthContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -32,6 +33,9 @@ const GuestAddressScreen: React.FC<GuestAddressScreenProps> = ({
   onBack,
   isChangingAddress = false,
 }) => {
+  const { user } = useAuth();
+  const isRegisteredUser = user?.isRegistered;
+
   const [region, setRegion] = useState<Region>({
     latitude: initialLocation?.coords.latitude || 30.0444,
     longitude: initialLocation?.coords.longitude || 31.2357,
@@ -78,16 +82,50 @@ const GuestAddressScreen: React.FC<GuestAddressScreenProps> = ({
 
   const reverseGeocode = async (latitude: number, longitude: number) => {
     try {
-      // Use Google Geocoding API for better results
-      const response = await fetch(
-        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_PLACES_API_KEY}`
-      );
-      const data = await response.json();
+      // Try Google Geocoding API first if key is valid
+      if (GOOGLE_PLACES_API_KEY && !GOOGLE_PLACES_API_KEY.includes('YOUR_')) {
+        try {
+          console.log('[GUEST_ADDRESS] Attempting Google Geocoding API...');
+          const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_PLACES_API_KEY}`;
+          const response = await fetch(url);
 
-      if (data.results && data.results.length > 0) {
-        setDescription(data.results[0].formatted_address);
+          // Check if response is ok
+          if (!response.ok) {
+            console.log('[GUEST_ADDRESS] Google API response not ok:', response.status);
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          console.log('[GUEST_ADDRESS] Google API response status:', data.status);
+
+          if (data.status === 'OK' && data.results && data.results.length > 0) {
+            setDescription(data.results[0].formatted_address);
+            console.log('[GUEST_ADDRESS] Google geocode success:', data.results[0].formatted_address);
+            return;
+          } else if (data.status === 'REQUEST_DENIED') {
+            console.log('[GUEST_ADDRESS] Google API request denied. Please enable Geocoding API in Google Cloud Console');
+            console.log('[GUEST_ADDRESS] Error message:', data.error_message);
+          } else {
+            console.log('[GUEST_ADDRESS] Google geocode failed:', data.status, data.error_message);
+          }
+        } catch (googleError) {
+          console.log('[GUEST_ADDRESS] Google API error:', googleError);
+        }
       } else {
-        // Fallback to expo-location
+        console.log('[GUEST_ADDRESS] Google API key not configured');
+      }
+
+      // Fallback: Try expo-location with permission check
+      console.log('[GUEST_ADDRESS] Attempting expo-location reverse geocoding...');
+      try {
+        // Check if we have location permissions
+        const { status } = await Location.getForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('[GUEST_ADDRESS] Location permission not granted, skipping expo reverse geocode');
+          setDescription(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          return;
+        }
+
         const result = await Location.reverseGeocodeAsync({ latitude, longitude });
         if (result && result.length > 0) {
           const location = result[0];
@@ -98,11 +136,24 @@ const GuestAddressScreen: React.FC<GuestAddressScreenProps> = ({
             location.region,
             location.country
           ].filter(Boolean);
-          setDescription(parts.join(', ') || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          const address = parts.join(', ');
+          if (address) {
+            setDescription(address);
+            console.log('[GUEST_ADDRESS] Expo reverse geocode success:', address);
+          } else {
+            setDescription(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+            console.log('[GUEST_ADDRESS] No address parts found, using coordinates');
+          }
+        } else {
+          setDescription(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+          console.log('[GUEST_ADDRESS] No geocode results, using coordinates');
         }
+      } catch (expoError) {
+        console.log('[GUEST_ADDRESS] Expo reverse geocode error:', expoError);
+        setDescription(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
       }
     } catch (error) {
-      console.error('Reverse geocode error:', error);
+      console.error('[GUEST_ADDRESS] Reverse geocode error:', error);
       setDescription(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
     }
   };
@@ -235,23 +286,45 @@ const GuestAddressScreen: React.FC<GuestAddressScreenProps> = ({
     try {
       setIsLoading(true);
 
-      // Create guest address via API
-      const fcmToken = (await AsyncStorage.getItem('@mira_fcm_token')) || '';
-      const payload = {
-        fcmToken,
-        description: description.trim(),
-        addressTag: finalTag,
-        Latitude: currentCenter.latitude,
-        Longitude: currentCenter.longitude,
-      };
+      let response: any;
+      let addressId: number;
 
-      console.log('[GUEST_ADDRESS] Creating/Updating address:', payload);
-      const response = await createGuestAddress(payload);
-      console.log('[GUEST_ADDRESS] Response:', response);
+      if (isRegisteredUser) {
+        // Registered user - use createAddress API
+        const payload = {
+          addressTag: finalTag,
+          description: description.trim(),
+          latitude: currentCenter.latitude,
+          longitude: currentCenter.longitude,
+        };
+
+        console.log('[GUEST_ADDRESS] Creating address for registered user:', payload);
+        response = await createAddress(payload);
+        console.log('[GUEST_ADDRESS] Response:', response);
+
+        // Extract the first address ID from the response
+        addressId = response?.data?.[0]?.id || response?.id;
+      } else {
+        // Guest user - use createGuestAddress API
+        const fcmToken = (await AsyncStorage.getItem('@mira_fcm_token')) || '';
+        const payload = {
+          fcmToken,
+          description: description.trim(),
+          addressTag: finalTag,
+          Latitude: currentCenter.latitude,
+          Longitude: currentCenter.longitude,
+        };
+
+        console.log('[GUEST_ADDRESS] Creating address for guest user:', payload);
+        response = await createGuestAddress(payload);
+        console.log('[GUEST_ADDRESS] Response:', response);
+
+        addressId = response?.addressId;
+      }
 
       // Save to local storage
       await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
-        id: response?.addressId,
+        id: addressId,
         tag: finalTag,
         description: description.trim(),
         lat: currentCenter.latitude,
@@ -260,7 +333,7 @@ const GuestAddressScreen: React.FC<GuestAddressScreenProps> = ({
 
       // Call onConfirm with complete address data including id
       onConfirm({
-        id: response?.addressId,
+        id: addressId,
         address: description.trim(),
         description: description.trim(),
         tag: finalTag,

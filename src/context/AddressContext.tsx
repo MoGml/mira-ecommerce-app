@@ -8,6 +8,7 @@ export interface AddressContextType {
   setSelectedAddress: (address: Address | null) => Promise<void>;
   clearSelectedAddress: () => Promise<void>;
   hasValidAddress: () => boolean;
+  reloadAddress: () => Promise<void>;
 }
 
 const AddressContext = createContext<AddressContextType | undefined>(undefined);
@@ -63,6 +64,10 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return selectedAddress !== null && selectedAddress.id !== undefined;
   };
 
+  const reloadAddress = async () => {
+    await loadSelectedAddress();
+  };
+
   return (
     <AddressContext.Provider
       value={{
@@ -71,6 +76,7 @@ export const AddressProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSelectedAddress,
         clearSelectedAddress,
         hasValidAddress,
+        reloadAddress,
       }}
     >
       {children}

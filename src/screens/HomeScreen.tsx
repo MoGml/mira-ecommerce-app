@@ -8,8 +8,13 @@ import { useAddress } from '../context/AddressContext';
 
 export default function HomeScreen() {
   const { user, needsAddressSetup } = useAuth();
-  const { selectedAddress, isLoading: addressLoading } = useAddress();
+  const { selectedAddress, isLoading: addressLoading, reloadAddress } = useAddress();
   const navigation = useNavigation();
+
+  // Reload address from storage when screen mounts
+  useEffect(() => {
+    reloadAddress();
+  }, []);
 
   // Handle address setup redirect for logged-in users
   useEffect(() => {

@@ -40,11 +40,21 @@ async function buildHeaders(extra?: HeadersInit) {
     "Content-Type": "application/json",
   };
 
-  const language = (await AsyncStorage.getItem(LANGUAGE_KEY)) || "en";
+  // Get or set default language
+  let language = await AsyncStorage.getItem(LANGUAGE_KEY);
+  if (!language) {
+    language = "en";
+    await AsyncStorage.setItem(LANGUAGE_KEY, language);
+    console.log("📝 [API] Set default language:", language);
+  }
   headers["Accept-Language"] = language;
 
+  // Get or create device ID
   const deviceId = await getOrCreateDeviceId();
   headers["X-Device-Id"] = deviceId;
+
+  console.log("📱 [API] Device ID:", deviceId);
+  console.log("🌐 [API] Language:", language);
 
   const token = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
   if (token) {
@@ -155,6 +165,14 @@ export async function apiFetch(
   };
 
   console.log("🌐 [API_REQUEST]", JSON.stringify(requestLog, null, 2));
+
+  // Verify critical headers are present
+  if (!headers["X-Device-Id"]) {
+    console.error("❌ [API_REQUEST] Missing X-Device-Id header!");
+  }
+  if (!headers["Accept-Language"]) {
+    console.error("❌ [API_REQUEST] Missing Accept-Language header!");
+  }
 
   const requestPromise = (async () => {
     let lastError: any;

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
@@ -59,10 +59,11 @@ const LocationAccessScreen: React.FC<LocationAccessScreenProps> = ({
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoBox}>
-            <View style={styles.logoHandle} />
-          </View>
-          <Text style={styles.logoText}>mira</Text>
+          <Image
+            source={require('../../../assets/mira_bag.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
 
         {/* Location Icon */}
@@ -142,27 +143,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 32,
   },
-  logoBox: {
-    width: 48,
-    height: 48,
-    backgroundColor: '#FF0000',
-    borderRadius: 10,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 6,
-    marginBottom: 6,
-  },
-  logoHandle: {
-    width: 24,
-    height: 2.5,
-    backgroundColor: 'white',
-    borderRadius: 2,
-  },
-  logoText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#FF0000',
-    letterSpacing: 1,
+  logo: {
+    width: 80,
+    height: 80,
   },
   locationIconContainer: {
     alignItems: 'center',

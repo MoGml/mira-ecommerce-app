@@ -291,24 +291,14 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
         );
 
       case 'add-address':
-        // Use GuestAddressScreen for guest users, AddAddressScreen for registered users
-        if (isGuestMode) {
-          return (
-            <GuestAddressScreen
-              initialLocation={currentLocation}
-              onConfirm={handleAddressConfirmed}
-              onBack={currentLocation ? handleBackToLocationAccess : undefined}
-            />
-          );
-        } else {
-          return (
-            <AddAddressScreen
-              initialLocation={currentLocation}
-              onConfirm={handleAddressConfirmed}
-              onBack={handleBackToLocationAccess}
-            />
-          );
-        }
+        // Use GuestAddressScreen for both guest and registered users (has area coverage checking)
+        return (
+          <GuestAddressScreen
+            initialLocation={currentLocation}
+            onConfirm={handleAddressConfirmed}
+            onBack={currentLocation ? handleBackToLocationAccess : undefined}
+          />
+        );
 
       case 'complete':
         return (
