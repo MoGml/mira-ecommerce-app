@@ -91,3 +91,6 @@ web-build/
 # Note: Firebase config files are now tracked for EAS Build
 # android/app/google-services.json
 # ios/**/GoogleService-Info.plist
+
+# Windows special files
+nul
