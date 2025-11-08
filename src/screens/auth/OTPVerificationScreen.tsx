@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -137,10 +137,11 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoBox}>
-            <View style={styles.logoHandle} />
-          </View>
-          <Text style={styles.logoText}>mira</Text>
+          <Image
+            source={require('../../../assets/logo.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </View>
 
         <View style={styles.progressBar}>
@@ -150,12 +151,16 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         </View>
 
         <Text style={styles.title}>
-          {isRegistered && userName 
+          {isRegistered && userName
             ? `Welcome back ${userName}!`
-            : "We Just texted you, what's{'\n'}the code?"}
+            : "We Just texted you, what's the code?"}
         </Text>
 
-        {!isRegistered && (
+        {isRegistered && userName ? (
+          <Text style={styles.subtitle}>
+            Please enter the code we text you with.
+          </Text>
+        ) : (
           <Text style={styles.subtitle}>
             Please enter the code you{'\n'}
             <Text style={styles.subtitleBold}>received</Text>
@@ -232,27 +237,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     marginTop: 20,
   },
-  logoBox: {
-    width: 60,
+  logo: {
+    width: 120,
     height: 60,
-    backgroundColor: '#FF0000',
-    borderRadius: 12,
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    paddingTop: 8,
-    marginBottom: 8,
-  },
-  logoHandle: {
-    width: 30,
-    height: 3,
-    backgroundColor: 'white',
-    borderRadius: 2,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FF0000',
-    letterSpacing: 1,
   },
   progressBar: {
     flexDirection: 'row',

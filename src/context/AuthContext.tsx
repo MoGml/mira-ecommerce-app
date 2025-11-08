@@ -89,9 +89,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const userData = await AsyncStorage.getItem(STORAGE_KEY);
       const authStatus = await AsyncStorage.getItem(AUTH_STATUS_KEY);
+      const authToken = await AsyncStorage.getItem(AUTH_TOKEN_KEY);
+
+      console.log('[AUTH] Loading user - userData exists:', !!userData, 'authStatus:', authStatus, 'hasToken:', !!authToken);
 
       if (userData) {
         const parsedUser = JSON.parse(userData);
+        console.log('[AUTH] Loaded user from storage:', {
+          id: parsedUser.id,
+          name: parsedUser.name,
+          isRegistered: parsedUser.isRegistered
+        });
         setUser(parsedUser);
 
         // Sync selected address to AddressContext storage if it exists
@@ -104,8 +112,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (parsedUser.isRegistered && !parsedUser.selectedAddress) {
           setNeedsAddressSetup(true);
         }
+      } else if (authToken) {
+        // Has auth token but no user data - this shouldn't happen
+        // The token means user is logged in, so don't create a guest user
+        console.error('⚠️ [AUTH] Has auth token but no user data! This is a critical state issue.');
+        console.log('[AUTH] Clearing inconsistent state - user should re-login');
+        await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
+        await AsyncStorage.removeItem(AUTH_STATUS_KEY);
+        setUser(null);
       } else if (authStatus === 'guest') {
         // Guest user - create a guest user object
+        console.log('[AUTH] No user data but guest mode - creating guest user');
         const guestUser: User = {
           id: 'guest',
           name: 'Guest User',
@@ -113,6 +130,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isRegistered: false,
         };
         setUser(guestUser);
+      } else {
+        console.log('[AUTH] No user data and no guest mode - user is null');
       }
     } catch (error) {
       console.error('Error loading user:', error);
@@ -143,8 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('📱 [AUTH] Phone check result:', result);
 
       return {
-        exists: result.exists,
-        userName: undefined, // API doesn't return userName in CheckCustomerExist
+        exists: result.isExist,
+        userName: result.userName,
       };
     } catch (error: any) {
       console.error('❌ [AUTH] Failed to check phone number:', error);
@@ -174,6 +193,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       console.log('✅ [AUTH] Login successful:', response);
 
+      // Clear guest mode flag if it exists
+      await AsyncStorage.removeItem(AUTH_STATUS_KEY);
+
       // Store auth token
       await AsyncStorage.setItem(AUTH_TOKEN_KEY, response.token);
 
@@ -188,7 +210,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         selectedAddress: response.selectedAddress,
       };
 
+      console.log('👤 [AUTH] Created user object:', loggedInUser);
       await saveUser(loggedInUser);
+      console.log('✅ [AUTH] User saved and state updated');
 
       // Sync selected address to AddressContext storage
       if (response.selectedAddress) {
@@ -322,15 +346,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = async () => {
+  const logout = async (returnToGuest: boolean = false) => {
     try {
       await AsyncStorage.removeItem(STORAGE_KEY);
       await AsyncStorage.removeItem(AUTH_STATUS_KEY);
       await AsyncStorage.removeItem(AUTH_TOKEN_KEY);
       await AsyncStorage.removeItem('@mira_selected_address'); // Clear AddressContext storage
-      setUser(null);
-      setNeedsAddressSetup(false);
-      console.log('✅ [AUTH] Logged out and cleared all data');
+
+      if (returnToGuest) {
+        console.log('✅ [AUTH] Logged out - returning to guest mode');
+        // Put user into guest mode instead of null
+        await completeGuestFlow();
+      } else {
+        console.log('✅ [AUTH] Logged out - user will need to re-authenticate');
+        setUser(null);
+        setNeedsAddressSetup(false);
+      }
     } catch (error) {
       console.error('Error logging out:', error);
     }
@@ -338,7 +369,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const completeGuestFlow = async () => {
     try {
+      console.log('[AUTH] Completing guest flow...');
       await AsyncStorage.setItem(AUTH_STATUS_KEY, 'guest');
+
+      // Check if guest already has an address saved on the backend
+      const { getGuestAddress } = require('../services/api');
+      const guestAddress = await getGuestAddress();
+
+      console.log('[AUTH] Guest address check:', guestAddress);
+
+      const guestUser: User = {
+        id: 'guest',
+        name: 'Guest User',
+        phone: '',
+        isRegistered: false,
+        selectedAddress: guestAddress ? {
+          id: guestAddress.id,
+          addressTag: guestAddress.addressTag || 'Home',
+          description: guestAddress.description,
+          latitude: guestAddress.latitude,
+          longitude: guestAddress.longitude,
+          isDefault: guestAddress.isDefault || false,
+        } : null,
+      };
+
+      setUser(guestUser);
+
+      // If guest has an address, also save it to AddressContext storage
+      if (guestAddress) {
+        await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
+          id: guestAddress.id,
+          tag: guestAddress.addressTag || 'Home',
+          description: guestAddress.description,
+          lat: guestAddress.latitude,
+          lng: guestAddress.longitude,
+        }));
+        console.log('[AUTH] Guest address synced to local storage');
+        setNeedsAddressSetup(false);
+      } else {
+        console.log('[AUTH] No guest address found - will need address setup');
+        setNeedsAddressSetup(true);
+      }
+    } catch (error) {
+      console.error('[AUTH] Error completing guest flow:', error);
+      // Set guest user anyway, but mark as needing address setup
       const guestUser: User = {
         id: 'guest',
         name: 'Guest User',
@@ -346,8 +420,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isRegistered: false,
       };
       setUser(guestUser);
-    } catch (error) {
-      console.error('Error completing guest flow:', error);
+      setNeedsAddressSetup(true);
     }
   };
 

@@ -19,7 +19,12 @@
       "Bash(git commit:*)",
       "Bash(cat:*)",
       "Bash(npm install)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx expo start --help:*)",
+      "Bash(node:*)",
+      "Bash(npm --version:*)",
+      "Bash(dir:*)",
+      "Bash(nul)"
     ],
     "deny": [],
     "ask": []

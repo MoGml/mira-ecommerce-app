@@ -123,10 +123,10 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
             />
           </View>
 
-          <Text style={styles.orText}>or</Text>
+          {/* <Text style={styles.orText}>or</Text> */}
 
           {/* Social Sign Up */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.socialButton}
             onPress={() => handleSocialSignUp('apple')}
           >
@@ -140,7 +140,7 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
           >
             <Ionicons name="logo-google" size={20} color="#000" />
             <Text style={styles.socialButtonText}>Continue with Google</Text>
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </ScrollView>
 
         {/* Continue Button */}

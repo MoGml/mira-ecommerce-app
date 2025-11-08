@@ -32,7 +32,7 @@ interface AuthNavigatorProps {
 }
 
 const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
-  const { updateSelectedAddress, markAddressSetupComplete } = useAuth();
+  const { updateSelectedAddress, markAddressSetupComplete, completeGuestFlow } = useAuth();
   const [currentStep, setCurrentStep] = useState<AuthFlowStep>('splash');
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -254,9 +254,23 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
           <PhoneInputScreen
             onNext={handlePhoneSubmitted}
             onSkip={async () => {
-              await AsyncStorage.setItem(AUTH_STATUS_KEY, 'guest');
+              console.log('[AUTH_NAVIGATOR] User skipped login - completing guest flow');
               setIsGuestMode(true);
-              setCurrentStep('location-access');
+
+              // Complete guest flow which checks for existing guest address
+              await completeGuestFlow();
+
+              // Check if guest already has an address
+              const savedAddress = await AsyncStorage.getItem('@mira_selected_address');
+              if (savedAddress) {
+                console.log('[AUTH_NAVIGATOR] Guest has existing address - skipping location setup');
+                // Guest has an address, skip directly to home
+                onComplete();
+              } else {
+                console.log('[AUTH_NAVIGATOR] Guest has no address - showing location access');
+                // Guest needs to set up address
+                setCurrentStep('location-access');
+              }
             }}
             onBack={handleOnboardingFinish}
           />

@@ -716,8 +716,9 @@ export type Address = {
 
 // Check Customer Exist types
 export type CheckCustomerExistResponse = {
-  exists: boolean;
+  isExist: boolean;
   message?: string;
+  userName?: string;
 };
 
 export async function checkCustomerExist(
@@ -741,7 +742,8 @@ export async function checkCustomerExist(
 
     console.log("📞 [CHECK_CUSTOMER] Customer check result:", {
       phoneNumber,
-      exists: result.exists,
+      isExist: result.isExist,
+      userName: result.userName,
       message: result.message,
       timestamp: new Date().toISOString(),
     });

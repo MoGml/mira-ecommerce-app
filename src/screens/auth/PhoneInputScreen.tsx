@@ -59,7 +59,7 @@ const PhoneInputScreen: React.FC<PhoneInputScreenProps> = ({ onNext, onBack, onS
           <View style={[styles.progressSegment, styles.progressActive]} />
         </View>
 
-        <Text style={styles.title}>Everything you{'\n'}need always</Text>
+        <Text style={styles.title}>Everything you always need</Text>
 
         {/* Phone Input */}
         <View style={styles.inputContainer}>

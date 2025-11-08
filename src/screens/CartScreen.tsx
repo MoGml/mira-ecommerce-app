@@ -99,6 +99,19 @@ export default function CartScreen({ navigation }: any) {
       setError(null);
 
       console.log('🛒 [BAG] Fetching bag data from server...', isRefresh ? '(refresh)' : '(initial)');
+
+      // Debug: Check AsyncStorage directly to diagnose state issues
+      const userData = await AsyncStorage.getItem('@mira_user');
+      const authToken = await AsyncStorage.getItem('@mira_auth_token');
+      const authStatus = await AsyncStorage.getItem('@mira_auth_status');
+
+      console.log('🛒 [BAG] Storage state:', {
+        hasUserData: !!userData,
+        hasAuthToken: !!authToken,
+        authStatus,
+        tokenPreview: authToken ? authToken.substring(0, 20) + '...' : null
+      });
+
       console.log('🛒 [BAG] User authentication state:', {
         isAuthenticated,
         isRegistered: user?.isRegistered,
@@ -365,8 +378,15 @@ export default function CartScreen({ navigation }: any) {
       return;
     }
 
-    // Check if user is guest (not registered)
-    if (!user || !user.isRegistered) {
+    // Log user state for debugging
+    console.log('[CART] Checkout - User:', JSON.stringify(user, null, 2));
+    console.log('[CART] Checkout - isAuthenticated:', isAuthenticated);
+    console.log('[CART] Checkout - isRegistered:', user?.isRegistered);
+
+    // Check if user is authenticated and registered
+    if (!isAuthenticated || !user?.isRegistered) {
+      console.log('[CART] Blocking checkout - user not authenticated or not registered');
+      console.log('[CART] isAuthenticated:', isAuthenticated, 'isRegistered:', user?.isRegistered);
       Alert.alert(
         'Sign In Required',
         'Please sign in to proceed with checkout',
@@ -388,6 +408,8 @@ export default function CartScreen({ navigation }: any) {
       );
       return;
     }
+
+    console.log('[CART] Proceeding to checkout - User is authenticated and registered');
 
     const items = shipmentType
       ? (shipmentType === 'express' ? expressItems : scheduledItems)

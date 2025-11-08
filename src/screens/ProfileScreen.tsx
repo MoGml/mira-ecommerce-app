@@ -12,6 +12,9 @@ export default function ProfileScreen() {
   const { isAuthenticated, user, logout } = useAuth();
   const navigation = useNavigation<ProfileNavigationProp>();
 
+  // Debug logging
+  console.log('[PROFILE] User state:', { isAuthenticated, isRegistered: user?.isRegistered, user });
+
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -29,13 +32,13 @@ export default function ProfileScreen() {
     );
   };
 
-  const handleLogin = () => {
-    // Trigger auth flow by logging out (which will show auth screens)
-    navigation.navigate('PhoneInput');
+  const handleLogin = async () => {
+    // Clear any existing data and navigate to auth flow
+    await logout();
   };
 
-  // Guest Profile View
-  if (!isAuthenticated) {
+  // Guest Profile View - show for users who are not registered
+  if (!isAuthenticated || !user?.isRegistered) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -147,7 +150,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.walletInfo}>
               <Text style={styles.walletLabel}>Wallet</Text>
-              <Text style={styles.walletValue}>23.00 EGP</Text>
+              <Text style={styles.walletValue}>
+                {user?.walletBalance != null ? `${Number(user.walletBalance).toFixed(2)} EGP` : '0.00 EGP'}
+              </Text>
             </View>
           </View>
 
@@ -159,7 +164,9 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.walletInfo}>
               <Text style={styles.walletLabel}>Points</Text>
-              <Text style={styles.walletValue}>28374 pt</Text>
+              <Text style={styles.walletValue}>
+                {user?.points != null ? `${user.points} pt` : '0 pt'}
+              </Text>
             </View>
           </View>
         </View>
