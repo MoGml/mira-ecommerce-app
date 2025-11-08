@@ -23,6 +23,14 @@
         "resourceClass": "medium"
       }
     },
+    "testflight": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false,
+        "resourceClass": "medium",
+        "autoIncrement": true
+      }
+    },
     "production": {
       "distribution": "store",
       "ios": {
