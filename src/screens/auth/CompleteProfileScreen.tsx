@@ -11,42 +11,46 @@ interface CompleteProfileScreenProps {
 }
 
 const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, onComplete, onBack }) => {
-  const { register } = useAuth();
+  const { editProfile } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = async () => {
-    if (!name.trim()) {
-      Alert.alert('Required', 'Please enter your name');
-      return;
-    }
-
-    if (!email.trim()) {
-      Alert.alert('Required', 'Please enter your email');
-      return;
-    }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Invalid Email', 'Please enter a valid email address');
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const result = await register(name, email, phone);
-      
-      if (result.success) {
-        onComplete();
-      } else {
-        Alert.alert('Error', result.error || 'Failed to create account');
+  const handleContinue = async () => {
+    // Email validation (only if email is provided)
+    if (email.trim()) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        Alert.alert('Invalid Email', 'Please enter a valid email address');
+        return;
       }
-    } catch (error) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
+    }
+
+    // Both name and email are optional - user can skip this step
+    // If user provides any data, call EditProfile API
+    if (name.trim() || email.trim()) {
+      setIsLoading(true);
+      try {
+        const result = await editProfile(
+          name.trim() || undefined,
+          email.trim() || undefined
+        );
+
+        if (result.success) {
+          console.log('✅ [COMPLETE_PROFILE] Profile updated, proceeding to location setup');
+          onComplete();
+        } else {
+          Alert.alert('Error', result.error || 'Failed to update profile');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Something went wrong. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      // User skipped - proceed without updating profile
+      console.log('⏭️ [COMPLETE_PROFILE] User skipped profile completion');
+      onComplete();
     }
   };
 
@@ -86,14 +90,18 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
             <View style={[styles.progressSegment, styles.progressActive]} />
           </View>
 
-          <Text style={styles.title}>Let's Create your account</Text>
+          <Text style={styles.title}>Complete Your Profile</Text>
+          <Text style={styles.subtitle}>
+            Add your name and email (optional){'\n'}
+            You can skip this step if you prefer
+          </Text>
 
           {/* Name Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Name</Text>
+            <Text style={styles.inputLabel}>Name (Optional)</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="Hanzda"
+              placeholder="Enter your name"
               placeholderTextColor="#999"
               value={name}
               onChangeText={setName}
@@ -103,10 +111,10 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
 
           {/* Email Input */}
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Email</Text>
+            <Text style={styles.inputLabel}>Email (Optional)</Text>
             <TextInput
               style={styles.textInput}
-              placeholder="Hanzadahzada@gmail.com"
+              placeholder="Enter your email"
               placeholderTextColor="#999"
               value={email}
               onChangeText={setEmail}
@@ -135,17 +143,17 @@ const CompleteProfileScreen: React.FC<CompleteProfileScreenProps> = ({ phone, on
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Sign Up Button */}
+        {/* Continue Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.signUpButton, (!name || !email) && styles.signUpButtonDisabled]}
-            onPress={handleSignUp}
-            disabled={!name || !email || isLoading}
+            style={styles.signUpButton}
+            onPress={handleContinue}
+            disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signUpButtonText}>Sign up</Text>
+              <Text style={styles.signUpButtonText}>Continue</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -199,7 +207,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 32,
+    marginBottom: 12,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 24,
+    lineHeight: 20,
   },
   inputContainer: {
     marginBottom: 20,

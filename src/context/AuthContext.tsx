@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { AUTH_STATUS_KEY, AUTH_TOKEN_KEY, login as apiLogin, LoginRequest, Address, checkCustomerExist, customerRegister, CustomerRegisterRequest } from '../services/api';
+import {
+  AUTH_STATUS_KEY,
+  AUTH_TOKEN_KEY,
+  login as apiLogin,
+  LoginRequest,
+  Address,
+  checkCustomerExist,
+  editProfile,
+  EditProfileRequest,
+  customerRegister,
+  CustomerRegisterRequest
+} from '../services/api';
 import { AppState } from 'react-native';
 
 export interface User {
@@ -21,7 +32,8 @@ interface AuthContextType {
   isLoading: boolean;
   needsAddressSetup: boolean;
   login: (phone: string, otp: string) => Promise<{ success: boolean; isNewUser: boolean; error?: string; needsAddressSetup?: boolean }>;
-  register: (name: string, email: string, phone: string) => Promise<{ success: boolean; error?: string }>;
+  register: (name: string, email: string, phone: string) => Promise<{ success: boolean; error?: string }>; // Deprecated - kept for backward compatibility
+  editProfile: (name?: string, email?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   checkPhoneNumber: (phone: string) => Promise<{ exists: boolean; userName?: string }>;
   completeGuestFlow: () => Promise<void>;
@@ -150,8 +162,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Prepare login request
       const loginRequest: LoginRequest = {
-        fcmToken: 'temp_fcm_token', // TODO: Replace with real FCM token from Firebase
-        idToken: otp, // Using OTP as idToken for now
+        fcmToken: undefined, // TODO: Replace with real FCM token from Firebase
+        otp: otp,
         phoneNumber: phoneNumber,
         countryCode: countryCode,
       };
@@ -192,7 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       return {
         success: true,
-        isNewUser: false, // API handles registration, so all successful logins are existing users
+        isNewUser: !response.isExist, // Use isExist from API to determine if this is a new user
         needsAddressSetup: needsAddress,
       };
     } catch (error: any) {
@@ -205,7 +217,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // DEPRECATED: Use editProfile instead for new users after Login
+  // Kept for backward compatibility only
   const register = async (name: string, email: string, phone: string): Promise<{ success: boolean; error?: string }> => {
+    console.warn('⚠️ [AUTH] register() is deprecated. Use login() followed by editProfile() instead.');
     try {
       // Egypt country code - can be made dynamic later
       const countryCode = 20;
@@ -259,6 +274,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return {
         success: false,
         error: error.message || 'Registration failed. Please try again.',
+      };
+    }
+  };
+
+  const editProfileFunc = async (name?: string, email?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      if (!user) {
+        console.error('❌ [AUTH] Cannot edit profile - no user logged in');
+        return {
+          success: false,
+          error: 'You must be logged in to edit your profile.',
+        };
+      }
+
+      console.log('✏️ [AUTH] Editing profile:', { name, email });
+
+      const editProfileRequest: EditProfileRequest = {
+        fcmToken: undefined, // TODO: Add FCM token from Firebase
+        email: email,
+        name: name,
+      };
+
+      const response = await editProfile(editProfileRequest);
+
+      console.log('✅ [AUTH] Profile updated successfully:', response);
+
+      // Update user object with new information
+      const updatedUser: User = {
+        ...user,
+        name: response.displayName || user.name,
+        email: response.email || user.email,
+        walletBalance: response.wallet,
+        points: response.points,
+      };
+
+      await saveUser(updatedUser);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('❌ [AUTH] Profile update failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Profile update failed. Please try again.',
       };
     }
   };
@@ -329,6 +387,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         needsAddressSetup,
         login,
         register,
+        editProfile: editProfileFunc,
         logout,
         checkPhoneNumber,
         completeGuestFlow,

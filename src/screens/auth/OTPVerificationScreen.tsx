@@ -93,27 +93,22 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
 
     setIsLoading(true);
     try {
-      if (isRegistered) {
-        // Existing user - call login API
-        console.log('📱 [OTP] Existing user - calling login API');
-        const result = await login(phone, code);
+      // Call login API for both new and existing users
+      // The Login API now handles both cases and returns isExist to indicate if user exists
+      console.log('📱 [OTP] Calling login API for user verification');
+      const result = await login(phone, code);
 
-        if (result.success) {
-          onVerified(false, result.needsAddressSetup);
-        } else {
-          Alert.alert('Invalid Code', result.error || 'The code you entered is incorrect');
-          setOtp(['', '', '', '']);
-          inputRefs[0].current?.focus();
-        }
+      if (result.success) {
+        // result.isNewUser is determined by isExist from API response
+        console.log('📱 [OTP] Login successful:', {
+          isNewUser: result.isNewUser,
+          needsAddressSetup: result.needsAddressSetup
+        });
+        onVerified(result.isNewUser, result.needsAddressSetup);
       } else {
-        // New user - just verify OTP and proceed to registration
-        console.log('📱 [OTP] New user - OTP verified, proceeding to registration');
-
-        // TODO: In a real app, you would verify the OTP with Firebase or your SMS service here
-        // For now, we'll accept any 4-digit code and proceed to registration
-
-        // Proceed to complete profile (registration form)
-        onVerified(true, undefined);
+        Alert.alert('Invalid Code', result.error || 'The code you entered is incorrect');
+        setOtp(['', '', '', '']);
+        inputRefs[0].current?.focus();
       }
     } catch (error) {
       Alert.alert('Error', 'Something went wrong. Please try again.');

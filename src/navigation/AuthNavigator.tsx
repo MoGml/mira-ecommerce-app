@@ -66,9 +66,17 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
         // Guest mode and onboarding already seen - check for guest address
         setIsGuestMode(true);
         try {
+          console.log('[AUTH_NAVIGATOR] Guest mode detected - checking for existing address');
           const guestAddress = await getGuestAddress();
+
           if (guestAddress) {
-            // Guest has an address - navigate to home
+            // Guest has an address - use default or first address
+            console.log('[AUTH_NAVIGATOR] Guest address found:', {
+              id: guestAddress.id,
+              tag: guestAddress.addressTag,
+              isDefault: guestAddress.isDefault,
+            });
+
             await AsyncStorage.setItem('@mira_selected_address', JSON.stringify({
               id: guestAddress.id,
               tag: guestAddress.addressTag,
@@ -76,18 +84,21 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
               lat: guestAddress.latitude,
               lng: guestAddress.longitude,
             }));
+
+            console.log('[AUTH_NAVIGATOR] Guest address saved - completing flow');
             setCurrentStep('complete');
             onComplete();
             return;
           } else {
-            // Guest without address - go to add address
-            setCurrentStep('add-address');
+            // Guest without address - go to location access then address creation
+            console.log('[AUTH_NAVIGATOR] No guest address found - directing to location access');
+            setCurrentStep('location-access');
             return;
           }
         } catch (error) {
           console.log('[AUTH_NAVIGATOR] Error checking guest address:', error);
-          // On error, go to add address screen
-          setCurrentStep('add-address');
+          // On error, go to location access screen
+          setCurrentStep('location-access');
           return;
         }
       }
@@ -124,13 +135,19 @@ const AuthNavigator: React.FC<AuthNavigatorProps> = ({ onComplete }) => {
   };
 
   const handleOTPVerified = (isNewUser: boolean, needsAddressSetup?: boolean) => {
+    console.log('[AUTH_NAVIGATOR] OTP verified:', { isNewUser, needsAddressSetup });
+
     if (isNewUser) {
+      // New user (isExist=false from API) - go to complete profile (optional)
+      console.log('[AUTH_NAVIGATOR] New user - directing to complete profile');
       setCurrentStep('complete-profile');
     } else if (needsAddressSetup) {
-      // Logged-in user needs address setup - go directly to address creation
-      setCurrentStep('add-address');
+      // Existing user without address - go to location access then address creation
+      console.log('[AUTH_NAVIGATOR] Existing user needs address - directing to location access');
+      setCurrentStep('location-access');
     } else {
-      // Logged-in user with existing address - complete the flow
+      // Existing user with address - complete the flow
+      console.log('[AUTH_NAVIGATOR] Existing user with address - completing flow');
       setCurrentStep('complete');
       onComplete();
     }

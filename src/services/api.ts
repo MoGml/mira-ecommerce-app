@@ -285,27 +285,71 @@ export type CreateGuestAddressResponse = {
 export type GuestAddress = {
   id: number;
   addressTag: string;
-  street: string | null;
-  building: string | null;
-  floor: string | null;
-  appartmentNumber: string | null;
-  landmark: string | null;
+  street?: string | null;
+  building?: string | null;
+  floor?: string | null;
+  appartmentNumber?: string | null;
+  landmark?: string | null;
   latitude: number;
   longitude: number;
-  newContact: boolean;
-  contactPerson: string | null;
-  contactPersonNumber: string | null;
+  newContact?: boolean;
+  contactPerson?: string | null;
+  contactPersonNumber?: string | null;
   description: string;
   isDefault: boolean;
 };
 
+export type GetGuestAddressResponse = {
+  pageIndex: number;
+  pageSize: number;
+  count: number;
+  data: GuestAddress[];
+};
+
 export async function getGuestAddress(): Promise<GuestAddress | null> {
   try {
+    console.log("🏠 [GET_GUEST_ADDRESS] Fetching guest address:", {
+      timestamp: new Date().toISOString(),
+    });
+
     const response = await apiFetch("Addresses/GetGuestAddress", {
       method: "GET",
     });
-    return response as GuestAddress;
+
+    console.log("🏠 [GET_GUEST_ADDRESS] Response received:", {
+      response,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Handle paginated response format
+    if (response && typeof response === "object" && "data" in response) {
+      const paginatedResponse = response as GetGuestAddressResponse;
+
+      // Return the default address or the first address if no default is set
+      if (paginatedResponse.data && paginatedResponse.data.length > 0) {
+        const defaultAddress = paginatedResponse.data.find(addr => addr.isDefault);
+        const selectedAddress = defaultAddress || paginatedResponse.data[0];
+
+        console.log("🏠 [GET_GUEST_ADDRESS] Guest address found:", {
+          addressId: selectedAddress.id,
+          isDefault: selectedAddress.isDefault,
+          totalAddresses: paginatedResponse.data.length,
+          timestamp: new Date().toISOString(),
+        });
+
+        return selectedAddress;
+      }
+    }
+
+    console.log("🏠 [GET_GUEST_ADDRESS] No guest address found");
+    return null;
   } catch (e: any) {
+    console.log("🏠 [GET_GUEST_ADDRESS] Error fetching guest address:", {
+      status: e.status,
+      message: e.message,
+      timestamp: new Date().toISOString(),
+    });
+
     // If no guest address found, return null
     if (e.status === 404 || e.status === 400) {
       return null;
@@ -772,8 +816,8 @@ export async function customerRegister(
 }
 
 export type LoginRequest = {
-  fcmToken: string;
-  idToken: string;
+  fcmToken?: string;
+  otp: string;
   phoneNumber: string;
   countryCode: number;
 };
@@ -785,18 +829,101 @@ export type LoginResponse = {
   phoneNumber: string;
   displayName: string;
   token: string;
+  isExist: boolean;
   selectedAddress: Address | null;
 };
 
 export async function login(payload: LoginRequest): Promise<LoginResponse> {
   try {
-    return await apiFetch("Accounts/Login", {
+    console.log("🔐 [LOGIN] Attempting login:", {
+      phoneNumber: payload.phoneNumber,
+      countryCode: payload.countryCode,
+      hasFcmToken: !!payload.fcmToken,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await apiFetch("Accounts/Login", {
       method: "POST",
       body: payload,
     });
+
+    console.log("🔐 [LOGIN] Login successful:", {
+      customerId: result.customerId,
+      phoneNumber: result.phoneNumber,
+      displayName: result.displayName,
+      isExist: result.isExist,
+      hasSelectedAddress: !!result.selectedAddress,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
   } catch (e: any) {
+    console.error("🔐 [LOGIN] Login failed:", {
+      phoneNumber: payload.phoneNumber,
+      error: e.message,
+      status: e.status,
+      body: e.body,
+      timestamp: new Date().toISOString(),
+    });
+
     // Re-throw with additional context
     const error: any = new Error(e.message || "Failed to login");
+    error.status = e.status;
+    error.body = e.body;
+    throw error;
+  }
+}
+
+// Edit Profile types (replaces Register for new users)
+export type EditProfileRequest = {
+  fcmToken?: string;
+  email?: string;
+  name?: string;
+};
+
+export type EditProfileResponse = {
+  customerId: number;
+  wallet: number;
+  points: number;
+  phoneNumber: string;
+  displayName: string;
+  email?: string;
+};
+
+export async function editProfile(
+  payload: EditProfileRequest
+): Promise<EditProfileResponse> {
+  try {
+    console.log("✏️ [EDIT_PROFILE] Updating profile:", {
+      hasName: !!payload.name,
+      hasEmail: !!payload.email,
+      hasFcmToken: !!payload.fcmToken,
+      timestamp: new Date().toISOString(),
+    });
+
+    const result = await apiFetch("Accounts/EditProfile", {
+      method: "POST",
+      body: payload,
+    });
+
+    console.log("✏️ [EDIT_PROFILE] Profile updated successfully:", {
+      customerId: result.customerId,
+      displayName: result.displayName,
+      email: result.email,
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
+  } catch (e: any) {
+    console.error("✏️ [EDIT_PROFILE] Profile update failed:", {
+      error: e.message,
+      status: e.status,
+      body: e.body,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Re-throw with additional context
+    const error: any = new Error(e.message || "Failed to update profile");
     error.status = e.status;
     error.body = e.body;
     throw error;
