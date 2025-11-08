@@ -301,12 +301,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('✅ [AUTH] Profile updated successfully:', response);
 
       // Update user object with new information
+      // Note: API may return empty response, so we use provided values as fallback
       const updatedUser: User = {
         ...user,
-        name: response.displayName || user.name,
-        email: response.email || user.email,
-        walletBalance: response.wallet,
-        points: response.points,
+        name: name || response.displayName || user.name,
+        email: email || response.email || user.email,
+        walletBalance: response.wallet || user.walletBalance,
+        points: response.points || user.points,
       };
 
       await saveUser(updatedUser);

@@ -906,6 +906,27 @@ export async function editProfile(
       body: payload,
     });
 
+    console.log("✏️ [EDIT_PROFILE] Raw API response:", {
+      result,
+      hasResult: !!result,
+      resultType: typeof result,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Handle empty response (API returns 200 with no body)
+    if (!result || typeof result !== "object") {
+      console.log("✏️ [EDIT_PROFILE] Empty response - profile updated successfully");
+      // Return a minimal response object since API doesn't return user data
+      return {
+        customerId: 0,
+        wallet: 0,
+        points: 0,
+        phoneNumber: "",
+        displayName: payload.name || "",
+        email: payload.email,
+      };
+    }
+
     console.log("✏️ [EDIT_PROFILE] Profile updated successfully:", {
       customerId: result.customerId,
       displayName: result.displayName,
