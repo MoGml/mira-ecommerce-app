@@ -339,17 +339,34 @@ export default function SubCategoriesScreen({ route, navigation }: any) {
       console.log('🚫 [LOAD_MORE] Skipping load more - loading:', loading, 'hasMore:', hasMore, 'isLoadingProducts:', isLoadingProducts);
       return;
     }
-    
+
     setLoading(true);
     try {
       const nextPage = page + 1;
       console.log('🌐 [LOAD_MORE] Loading page:', nextPage);
       const data = await getCatalog(categoryId, nextPage, 20, selectedSubCategoryId || undefined);
-      console.log('✅ [LOAD_MORE] Loaded', data.products?.length || 0, 'more products');
-      
-      setProducts(prev => [...prev, ...(data.products || [])]);
+
+      // Transform packs into products (same as loadCatalog)
+      const transformedProducts: Product[] = (data.packs || data.products || []).map((pack: any, index: number) => {
+        // If it's already a Product with packs, return as-is
+        if (pack.packs && Array.isArray(pack.packs)) {
+          return pack as Product;
+        }
+
+        // Otherwise, transform Pack into Product
+        return {
+          productId: pack.packagingId || index,
+          subCategoryId: selectedSubCategoryId || 0,
+          title: pack.name || '',
+          packs: [pack]
+        } as Product;
+      });
+
+      console.log('✅ [LOAD_MORE] Loaded', transformedProducts.length, 'more products');
+
+      setProducts(prev => [...prev, ...transformedProducts]);
       setPage(nextPage);
-      setHasMore(data.products && data.products.length >= 20);
+      setHasMore((data.packs || data.products || []).length >= 20);
     } catch (err: any) {
       console.error('❌ [LOAD_MORE] Error loading more products:', err);
       // Don't show alert for pagination errors, just log them
